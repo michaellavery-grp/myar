@@ -196,14 +196,10 @@ def show_messages(scr, game, colors):
     if not msgs:
         _addstr(scr, MSG_ROW, 0, "")
         return
-    chunks, line = [], ""
-    for m in msgs:
-        if line and len(line) + len(m) + 1 > 70:
-            chunks.append(line)
-            line = m
-        else:
-            line = f"{line} {m}".strip()
-    chunks.append(line)
+    # Word-wrap the whole queue: a single long message (a companion's
+    # farewell, a tame success) must split into --More-- pages too,
+    # not silently truncate at the screen edge.
+    chunks = _wrap_text(" ".join(msgs), 70)
     for i, chunk in enumerate(chunks):
         scr.move(MSG_ROW, 0)
         scr.clrtoeol()

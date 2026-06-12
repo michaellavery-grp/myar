@@ -160,6 +160,7 @@ class Monster:
         self.attitude = "hostile"   # hostile | wary | friendly
         self.tamed = False
         self.rooted = 0
+        self.stuck = 0   # turns a companion has failed to close distance
 
     @property
     def name(self):

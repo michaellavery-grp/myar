@@ -303,9 +303,12 @@ Morgoth holds the Amulet of Yendor.
   Ranger tames at +55%). Calm Animal makes any beast friendly first —
   the easiest mark.
 - **Your companion** (one at a time) follows at heel, savages hostile
-  monsters (kills credit you), swaps places when you bump into it, rides
-  trapdoors and staircases with you when within 2 tiles — or waits
-  faithfully on the old level. It appears on your `@` sheet with its HP.
+  monsters (kills credit you), swaps places when you bump into it, and
+  rides trapdoors and staircases with you **from anywhere on the level**
+  — a companion is never left behind. It appears on your `@` sheet.
+- **Jumping:** a companion that gets wedged in a corridor or falls too
+  far behind simply *jumps* — it reappears at your side a turn or three
+  later. Loyalty finds a way.
 - **Releasing:** press `t` toward your own companion and confirm. It
   returns to the wild as a *friend* — it won't attack, and you can tame
   it again later. Found a lion you like better than your antelope? Set

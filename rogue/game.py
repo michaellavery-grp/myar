@@ -146,13 +146,12 @@ class Game:
         return self.levels[depth]
 
     def goto_depth(self, depth, arrive):
-        # A close companion takes the stairs with you
+        # A companion always finds the stairs — it follows from anywhere
+        # on the level, no matter how far it lagged behind.
         traveling_pet = None
         if (self.pet is not None
                 and getattr(self, "level", None) is not None
-                and self.pet in self.level.monsters
-                and _dist(self.pet.x, self.pet.y,
-                          self.player.x, self.player.y) <= 2):
+                and self.pet in self.level.monsters):
             self.level.monsters.remove(self.pet)
             traveling_pet = self.pet
         depth = max(1, min(MAX_DEPTH, depth))
@@ -1373,6 +1372,7 @@ class Game:
                        and not m.asleep
                        and _dist(pet.x, pet.y, m.x, m.y) <= 1), None)
         if target:
+            pet.stuck = 0
             attack_roll = random.randint(1, 20) + pet.level + 2
             if attack_roll >= target.type.ac:
                 dmg = max(1, roll(pet.type.dmg) + pet.level // 3)
@@ -1386,10 +1386,29 @@ class Game:
                 elif self.monster_visible(pet):
                     self.msg(f"Your {pet.name} bites the {target.name}.")
             return
-        if _dist(pet.x, pet.y, p.x, p.y) > 2:
+        d = _dist(pet.x, pet.y, p.x, p.y)
+        if d > 2:
             self._move_toward(pet, p.x, p.y)
-        elif chance(0.5):
-            self._move_random(pet)
+            if _dist(pet.x, pet.y, p.x, p.y) >= d:
+                pet.stuck += 1  # wedged on a corner, doorway or crowd
+            else:
+                pet.stuck = 0
+            # Jumping: a companion that loses you jumps to your side.
+            if d > 7 or pet.stuck >= 3:
+                self._pet_jump(pet)
+        else:
+            pet.stuck = 0
+            if chance(0.5):
+                self._move_random(pet)
+
+    def _pet_jump(self, pet):
+        """Companions never truly lose you — they jump to your side."""
+        spot = self._spot_near_player()
+        if not spot:
+            return
+        pet.x, pet.y = spot
+        pet.stuck = 0
+        self.msg(f"Your {pet.name} jumps out of the gloom to your side.")
 
     def _attack_pet(self, m, pet):
         attack_roll = random.randint(1, 20) + m.level

@@ -505,6 +505,59 @@ def test_taming():
     print("ok  taming: learn paths, tame, fight, release, tame anew")
 
 
+def test_message_wrapping():
+    """Single messages longer than the line must page via --More--."""
+    from .ui import _wrap_text
+    farewell = ("You scratch the antelope behind the ears and let it go. "
+                "It lingers a moment, then pads away, free.")
+    chunks = _wrap_text(farewell, 70)
+    assert len(chunks) >= 2, "long message did not split into pages"
+    assert all(len(c) <= 70 for c in chunks)
+    assert " ".join(chunks) == farewell, "wrapping lost words"
+    print("ok  long messages wrap into --More-- pages")
+
+
+def test_pet_jumping():
+    """A wedged or distant companion jumps to the player's side, and
+    stairs carry it from anywhere on the level."""
+    import rogue.game as game_mod
+    from .items import make_pet_food
+    from .monsters import ANIMAL_TYPES, Monster as M
+    g = Game("Houndmaster", _race("Human"), _cclass("Druid"))
+    p = g.player
+    wolf_t = next(t for t in ANIMAL_TYPES["forest"] if t.name == "wolf")
+    wolf = M(wolf_t, p.x + 1, p.y, 1)
+    wolf.asleep = False
+    g.level.monsters.append(wolf)
+    g.player.add_item(make_pet_food())
+    real_chance = game_mod.chance
+    game_mod.chance = lambda c: True
+    try:
+        assert g.tame(1, 0)
+    finally:
+        game_mod.chance = real_chance
+    # Strand the wolf far away: it must jump back within a few turns
+    far = g.level.random_floor(avoid=(p.x, p.y), min_dist=10)
+    if far:
+        wolf.x, wolf.y = far
+        for _ in range(4):
+            g._monsters_act()
+            g.drain_msgs()
+        from .game import _dist
+        assert _dist(wolf.x, wolf.y, p.x, p.y) <= 2, \
+            "stranded companion failed to jump to the player"
+    # Stairs carry the companion from ANY distance now
+    far = g.level.random_floor(avoid=(p.x, p.y), min_dist=10)
+    if far:
+        wolf.x, wolf.y = far
+    p.x, p.y = g.level.stairs_down
+    g.descend()
+    assert g.pet in g.level.monsters, \
+        "companion left behind on the old level"
+    g.drain_msgs()
+    print("ok  pet jumping: wedged pets jump to you, stairs never strand")
+
+
 def test_biomes_and_animals():
     from .dungeon import FOREST, SAVANNAH
     found_biomes, found_animals, found_shrine = set(), 0, False
@@ -733,6 +786,8 @@ if __name__ == "__main__":
     test_pet_food_scraps()
     test_drop_balance()
     test_taming()
+    test_message_wrapping()
+    test_pet_jumping()
     test_biomes_and_animals()
     test_nature_spells()
     test_user_save_fixture()
