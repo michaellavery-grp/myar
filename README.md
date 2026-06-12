@@ -183,6 +183,28 @@ and press `C` — the menu shows **only what you can make right now**.
   come out **masterwork** (+1); from **level 5**, **magical** (+2) — the
   odds improve with every level beyond.
 
+### Scrollcraft & Spellbooks (arcane casters)
+
+Wizards and Illusionists can turn the dungeon's fauna into a library:
+
+1. **Vellum** — 2 hides → 1 sheet.
+2. **Quills** — 2 feathers → 1 quill. Fowl (hens, roosters, ducks, geese,
+   cockatrices, the phoenix) shed feathers when slain.
+3. **Ink** — 2 gall glands → 1 vial. Giant centipedes carry the glands.
+4. **Copy a scroll** — 1 vellum + 1 ink + 1 quill duplicates any
+   *identified* scroll you carry; copies stack normally. Quills are
+   spent with every scribing job.
+5. **Spellbook** — 6 vellum + 1 hide + 1 ink binds a blank grimoire
+   (one per caster).
+6. **Etch** — 1 ink + 1 quill permanently engraves an identified scroll
+   into the book (the scroll is consumed). **Max 6 spells.**
+7. **Memorize** — after a **rest** (`.`) you may study the book and hold
+   up to **3** etched spells in mind; skip the menu (ESC) and your
+   previous memorization stands. Memorized spells are cast with `z`
+   using mana — Light (2), Identify (6), Magic Mapping (8),
+   Teleportation (8), Enchant Weapon/Armor (15) — turning one lucky
+   scroll find into a renewable power.
+
 ---
 
 ## Areas of the Dungeon
@@ -221,9 +243,18 @@ color-rendered version.
 | `f` | panther | forest | feline | carnivore | wary |
 | `q` | wild boar | forest | boar | omnivore | friendly |
 | `q` | stag | forest | cervine | herbivore | friendly |
+| `a` | duck | forest | fowl | omnivore | friendly |
+| `a` | goose | forest | fowl | omnivore | friendly |
+| `a` | phoenix | forest | fowl | carnivore | wary |
 | `f` | lion | savannah | feline | carnivore | wary |
 | `C` | hyena | savannah | canine | carnivore | wary |
 | `q` | antelope | savannah | cervine | herbivore | friendly |
+| `a` | hen | savannah | fowl | herbivore | friendly |
+| `a` | rooster | savannah | fowl | omnivore | friendly |
+| `a` | cockatrice | savannah | fowl | carnivore | wary |
+
+All fowl shed **feathers**; the phoenix regenerates and makes a
+spectacular companion.
 
 ### Monsters (hostile)
 
@@ -244,7 +275,7 @@ gold, gear, an ear *and* teeth from a single kill. Fanged animals
 | `o` | orc | 3–16 | humanoid, carries gold, fangs; drops orc ears |
 | `z` | zombie | 4–16 | undead, mindless |
 | `H` | hobgoblin | 5–18 | humanoid, fangs |
-| `c` | giant centipede | 5–18 | poison |
+| `c` | giant centipede | 5–18 | poison; drops gall glands (ink!) |
 | `W` | wight | 7–22 | undead |
 | `O` | ogre | 8–26 | humanoid, carries gold, fangs |
 | `T` | cave troll | 10–34 | humanoid, regenerates, fangs |

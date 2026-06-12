@@ -8,11 +8,14 @@ from .rng import roll, chance
 SYMBOLS = {
     "potion": "!", "scroll": "?", "weapon": ")", "armor": "]",
     "food": "%", "gold": "*", "amulet": ",", "material": "~", "bag": "&",
+    "spellbook": "+",
 }
 
-# Crafting ingredients harvested from slain monsters.
+# Crafting ingredients harvested from slain monsters (and the scribe's
+# materials made from them).
 MATERIALS = ("skin", "teeth", "hide", "bat eye", "snake venom", "rat tail",
-             "orc ear", "kobold tail", "bone", "drake hide", "dragon hide")
+             "orc ear", "kobold tail", "bone", "drake hide", "dragon hide",
+             "feather", "gall gland", "vellum", "quill", "ink")
 
 # Any two of these small parts make a portion of pet food — pets aren't picky.
 PET_SCRAPS = ("bat eye", "rat tail", "bone", "orc ear", "kobold tail")
@@ -40,6 +43,14 @@ RECIPES = [
     ("kobold-tail soup", {"kobold tail": 2, "rat tail": 1}, "food:ration"),
     ("pet food (any 2 small parts)",
      {"any:" + "|".join(PET_SCRAPS): 2}, "food:pet food"),
+    # -- the scribe's trade ------------------------------------------------
+    ("sheet of vellum", {"hide": 2}, "material:vellum"),
+    ("quill", {"feather": 2}, "material:quill"),
+    ("vial of ink", {"gall gland": 2}, "material:ink"),
+    ("spellbook", {"vellum": 6, "hide": 1, "ink": 1}, "spellbook"),
+    ("copy a scroll (casters)", {"vellum": 1, "ink": 1, "quill": 1},
+     "copy_scroll"),
+    ("etch a scroll into spellbook", {"ink": 1, "quill": 1}, "etch_scroll"),
 ]
 
 WEAPON_DEFS = {
@@ -170,7 +181,11 @@ def item_value(item):
     if item.kind == "material":
         return {"snake venom": 30, "bat eye": 20, "rat tail": 10,
                 "orc ear": 12, "kobold tail": 10, "bone": 10,
-                "drake hide": 60, "dragon hide": 120}.get(item.subtype, 15)
+                "drake hide": 60, "dragon hide": 120, "feather": 8,
+                "gall gland": 20, "vellum": 25, "quill": 15,
+                "ink": 30}.get(item.subtype, 15)
+    if item.kind == "spellbook":
+        return 150 + 100 * len(item.contents)
     if item.kind == "weapon":
         ench = item.hit_ench + item.dmg_ench
         return max(5, int(30 + _avg_dmg(item.dmg) * 15 + ench * 60))

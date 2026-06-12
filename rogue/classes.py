@@ -43,6 +43,16 @@ class CharClass:
 # Innate racial cantrip (Sun-Elves) — costs no mana.
 SUN_CANTRIP = Spell("sun_bolt", "Sunfire Cantrip", 1, 0)
 
+# Mana cost to cast a scroll-spell memorized from an etched spellbook.
+SCROLL_SPELL_MANA = {
+    "light": 2,
+    "identify": 6,
+    "magic mapping": 8,
+    "teleportation": 8,
+    "enchant weapon": 15,
+    "enchant armor": 15,
+}
+
 WIZARD_SPELLS = (
     Spell("magic_missile", "Magic Missile", 1, 2),
     Spell("light", "Light", 2, 2),

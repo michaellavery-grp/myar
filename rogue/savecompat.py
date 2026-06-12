@@ -109,9 +109,14 @@ def migrate_game(game):
                 bag.letter = "z"
                 p.inventory.append(bag)
 
+        _ensure(p, "memorized", [])
+        _ensure(p, "book_studied", True)
         _ensure(game, "pending_stat_points", 0)
         _ensure(game, "trade_requested", False)
         _ensure(game, "pet", None)
+        _ensure(game, "offer_study", False)
+        _ensure(game, "pending_copy", None)
+        _ensure(game, "pending_etch", None)
 
         # v9: fanged monsters now shed teeth. Back-pay for every fang the
         # old algorithm swallowed: six monster teeth, on the house.

@@ -106,6 +106,8 @@ def test_random_play():
                     while g.pending_stat_points > 0:
                         g.allocate_stat(random.choice(STAT_NAMES))
                     g.trade_requested = False
+                    g.offer_study = False
+                    g.pending_copy = g.pending_etch = None
                     g.drain_msgs()
             except GameOver:
                 pass
@@ -325,7 +327,11 @@ def test_crafting():
                make_material("dragon hide", 4)):
         p.add_item(it)
     bow = None
+    scribe_chain = ("material:vellum", "material:quill", "material:ink",
+                    "spellbook", "copy_scroll", "etch_scroll")
     for i, (name, needs, result) in enumerate(RECIPES):
+        if result in scribe_chain:
+            continue  # exercised by test_scrollcraft
         assert g.can_craft(RECIPES[i]), name
         if result in ("arrows", "poison_arrows"):
             bow = next(it for it in p.inventory if it.subtype == "short bow")
@@ -536,7 +542,9 @@ def test_pet_jumping():
         assert g.tame(1, 0)
     finally:
         game_mod.chance = real_chance
-    # Strand the wolf far away: it must jump back within a few turns
+    # Strand the wolf far away: it must jump back within a few turns.
+    # (Clear hostiles first — a companion in melee rightly stays to fight.)
+    g.level.monsters = [m for m in g.level.monsters if m.tamed]
     far = g.level.random_floor(avoid=(p.x, p.y), min_dist=10)
     if far:
         wolf.x, wolf.y = far
@@ -640,6 +648,113 @@ def test_pet_food_scraps():
         # scraps fully consumed
         assert all(g.material_count(s) == 0 for s in PET_SCRAPS), (a, b)
     print("ok  pet food from any two scraps (eye+bone, tails, ears...)")
+
+
+def test_scrollcraft():
+    """Vellum, quills, ink, spellbook, copying and etching scrolls."""
+    from .items import make_material, RECIPES, Item
+
+    def ridx(result):
+        return next(i for i, r in enumerate(RECIPES) if r[2] == result)
+
+    g = Game("Scribe", _race("Fairy"), _cclass("Illusionist"))
+    p = g.player
+    g.level.grid[p.y][p.x] = "="
+    for it in (make_material("hide", 16), make_material("feather", 4),
+               make_material("gall gland", 8)):
+        p.add_item(it)
+
+    # Raw scribe materials
+    for result, mat in (("material:vellum", "vellum"),
+                        ("material:quill", "quill"),
+                        ("material:ink", "ink")):
+        assert g.do_craft(ridx(result)), result
+        assert g.material_count(mat) >= 1, mat
+    # Enough vellum for the book (6) + a copy job (1)
+    for _ in range(6):
+        assert g.do_craft(ridx("material:vellum"))
+    for _ in range(3):
+        assert g.do_craft(ridx("material:ink"))
+    assert g.do_craft(ridx("material:quill"))
+
+    # The spellbook itself (and only one)
+    assert g.do_craft(ridx("spellbook"))
+    assert p.spellbook() is not None
+    assert not g.do_craft(ridx("spellbook")), "second grimoire allowed?"
+
+    # Copying: identified scrolls duplicate and stack
+    scroll = Item("scroll", "magic mapping", count=1)
+    p.add_item(scroll)
+    g.identify(scroll)
+    assert not g.do_craft(ridx("copy_scroll"))  # pends on scroll choice
+    assert g.pending_copy is not None
+    assert g.copy_scroll(scroll)
+    assert scroll.count == 2, "copied scroll did not stack"
+
+    # Etching: scroll becomes a permanent book spell
+    assert not g.do_craft(ridx("etch_scroll"))
+    assert g.pending_etch is not None
+    assert g.etch_scroll(scroll)
+    assert "magic mapping" in p.spellbook().contents
+    assert scroll.count == 1, "etching should consume one scroll"
+    assert not p.book_studied
+
+    # Rest offers study; memorize and cast from the book
+    assert g.rest()
+    assert g.offer_study
+    p.memorized = ["magic mapping"]
+    p.book_studied = True
+    g.offer_study = False
+    book_spell = next(s for s in p.known_spells()
+                      if s.key == "scroll:magic mapping")
+    p.mana = max(p.mana, book_spell.mana)
+    explored0 = len(g.level.explored)
+    assert g.cast(book_spell)
+    assert len(g.level.explored) > explored0, "book-cast mapping did nothing"
+
+    # Non-arcane casters are shut out
+    g2 = Game("Grunt", _race("Human"), _cclass("Fighter"))
+    g2.level.grid[g2.player.y][g2.player.x] = "="
+    for it in (make_material("vellum", 2), make_material("ink", 2),
+               make_material("quill", 2)):
+        g2.player.add_item(it)
+    s2 = Item("scroll", "light")
+    g2.player.add_item(s2)
+    g2.identify(s2)
+    assert not g2.do_craft(ridx("copy_scroll"))
+    assert g2.pending_copy is None, "fighter allowed to copy scrolls"
+    print("ok  scrollcraft: vellum/quill/ink, spellbook, copy, etch, cast")
+
+
+def test_fowl():
+    import rogue.game as game_mod
+    from .monsters import ANIMAL_TYPES, SPECIAL_PARTS, Monster as M
+    fowl = [t for ts in ANIMAL_TYPES.values() for t in ts
+            if t.genus == "fowl"]
+    names = {t.name for t in fowl}
+    assert names == {"hen", "rooster", "duck", "goose", "cockatrice",
+                     "phoenix"}, names
+    for t in fowl:
+        assert SPECIAL_PARTS[t.name][0] == "feather", t.name
+    assert SPECIAL_PARTS["giant centipede"][0] == "gall gland"
+    # A slain goose yields feathers (forced)
+    g = Game("Fowler", _race("Human"), _cclass("Fighter"))
+    p = g.player
+    goose_t = next(t for t in fowl if t.name == "goose")
+    goose = M(goose_t, p.x + 1, p.y, 1)
+    goose.asleep = False
+    g.level.monsters.append(goose)
+    real_chance = game_mod.chance
+    game_mod.chance = lambda c: True
+    try:
+        while goose in g.level.monsters:
+            g.attack(goose)
+    finally:
+        game_mod.chance = real_chance
+    drops = {i.subtype for i in g.level.items.get((goose.x, goose.y), [])
+             if i.kind == "material"}
+    assert "feather" in drops, drops
+    print("ok  fowl: six birds, feather drops, centipede gall glands")
 
 
 def test_drop_balance():
@@ -784,6 +899,8 @@ if __name__ == "__main__":
     test_multi_pickup()
     test_crafting_bag()
     test_pet_food_scraps()
+    test_scrollcraft()
+    test_fowl()
     test_drop_balance()
     test_taming()
     test_message_wrapping()

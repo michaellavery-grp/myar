@@ -44,6 +44,9 @@ class Game:
         self.pending_stat_points = 0
         self.trade_requested = False
         self.pet = None
+        self.offer_study = False
+        self.pending_copy = None   # materials owed once a scroll is chosen
+        self.pending_etch = None
         self._init_identification()
         self.level = self._get_level(1)
         self.player.x, self.player.y = self.level.stairs_up
@@ -111,7 +114,12 @@ class Game:
                      "kobold tail": ("a kobold tail", "kobold tails"),
                      "bone": ("a bleached bone", "bleached bones"),
                      "drake hide": ("a drake hide", "drake hides"),
-                     "dragon hide": ("a dragon hide", "dragon hides")}
+                     "dragon hide": ("a dragon hide", "dragon hides"),
+                     "feather": ("a feather", "feathers"),
+                     "gall gland": ("a gall gland", "gall glands"),
+                     "vellum": ("a sheet of vellum", "sheets of vellum"),
+                     "quill": ("a quill", "quills"),
+                     "ink": ("a vial of ink", "vials of ink")}
             one, many = words[item.subtype]
             name = one if n == 1 else f"{n} {many}"
         elif item.kind == "gold":
@@ -121,6 +129,8 @@ class Game:
             name = (f"a crafting bag ({total} material"
                     f"{'s' if total != 1 else ''})" if total
                     else "a crafting bag (empty)")
+        elif item.kind == "spellbook":
+            name = f"a spellbook ({len(item.contents)}/6 spells etched)"
         elif item.kind == "amulet":
             name = "the Amulet of Yendor"
         else:
@@ -423,16 +433,30 @@ class Game:
         return True
 
     def read(self, item):
-        p, lvl = self.player, self.level
+        if item.kind == "spellbook":
+            if not self.player.is_arcane():
+                self.msg("The glyphs swim before your untrained eyes.")
+                return False
+            self.player.book_studied = False
+            self.msg("You leaf through your spellbook. "
+                     "Rest (.) to commit spells to memory.")
+            return False
+        p = self.player
         sub = item.subtype
         p.remove_one(item)
         self.identify(item)
+        self._scroll_effect(sub)
+        return True
+
+    def _scroll_effect(self, sub):
+        """The effect of a scroll — read once, or cast from a spellbook."""
+        p, lvl = self.player, self.level
         if sub == "magic mapping":
             for y in range(len(lvl.grid)):
                 for x in range(len(lvl.grid[0])):
                     if lvl.grid[y][x] != ROCK:
                         lvl.explored.add((x, y))
-            self.msg("This scroll has a map of the level on it!")
+            self.msg("A map of the level unfolds in your mind!")
         elif sub == "teleportation":
             self._teleport()
         elif sub == "enchant weapon":
@@ -450,7 +474,7 @@ class Game:
                 self.msg("Your skin itches.")
         elif sub == "identify":
             self.pending_identify = True
-            self.msg("This is a scroll of identify!")
+            self.msg("Choose an item to identify!")
         elif sub == "light":
             self._light_room()
         return True
@@ -506,6 +530,11 @@ class Game:
         return True
 
     def rest(self):
+        p = self.player
+        book = p.spellbook()
+        if (p.is_arcane() and book is not None and book.contents
+                and not p.book_studied):
+            self.offer_study = True
         return True
 
     def fire(self):
@@ -738,6 +767,29 @@ class Game:
         if not self.can_craft(RECIPES[idx]):
             self.msg("You lack the materials for that.")
             return False
+        if result in ("copy_scroll", "etch_scroll"):
+            p = self.player
+            if not p.is_arcane():
+                self.msg("Only arcane casters work scroll-craft.")
+                return False
+            if result == "etch_scroll":
+                book = p.spellbook()
+                if book is None:
+                    self.msg("You need a spellbook to etch into.")
+                    return False
+                if len(book.contents) >= 6:
+                    self.msg("Your spellbook is full — six spells, no more.")
+                    return False
+            if not any(it.kind == "scroll" and self.is_identified(it)
+                       for it in p.inventory):
+                self.msg("You carry no identified scrolls to work from.")
+                return False
+            # Materials are spent when the scroll is chosen (UI follows up)
+            if result == "copy_scroll":
+                self.pending_copy = dict(needs)
+            else:
+                self.pending_etch = dict(needs)
+            return False
         if result in ("arrows", "poison_arrows"):
             bow = None
             if self.player.weapon and self.player.weapon.subtype in RANGED:
@@ -760,12 +812,26 @@ class Game:
                          f"holds {bow.poison_charges} poisoned shots.")
             self._gain_craft_exp(needs)
             return True
+        if result == "spellbook":
+            if self.player.spellbook() is not None:
+                self.msg("One grimoire is enough for any pair of hands.")
+                return False
+            item = Item("spellbook", "spellbook")
+            if not self.player.add_item(item):
+                self.msg("Your pack is too full to hold the finished work.")
+                return False
+            self._consume_materials(needs)
+            self.msg("You bind hide and vellum into a blank spellbook!")
+            self._gain_craft_exp(needs)
+            return True
         kind, _, subtype = result.partition(":")
         if kind == "potion":
             item = Item("potion", subtype)
             self.identify(item)  # you brewed it; no mystery what it is
         elif kind == "food":
             item = Item("food", subtype)
+        elif kind == "material":
+            item = make_material(subtype)
         elif kind == "armor":
             item = make_armor(subtype)
         else:
@@ -789,6 +855,53 @@ class Game:
         self._consume_materials(needs)
         self.msg(f"You work at the table... and finish "
                  f"{self.item_name(item)}!{tag}")
+        self._gain_craft_exp(needs)
+        return True
+
+    def copy_scroll(self, item):
+        """Finish a copy-scroll craft once the source scroll is chosen."""
+        needs, self.pending_copy = self.pending_copy, None
+        if needs is None:
+            return False
+        if item is None or item.kind != "scroll":
+            self.msg("You set the quill down, nothing copied.")
+            return False
+        if not self.is_identified(item):
+            self.msg("You can't copy glyphs you don't yet understand.")
+            return False
+        self._consume_materials(needs)
+        self.player.add_item(Item("scroll", item.subtype))
+        self.msg(f"You painstakingly copy {self.item_name(item)}. "
+                 "The new scroll joins the old.")
+        self._gain_craft_exp(needs)
+        return True
+
+    def etch_scroll(self, item):
+        """Finish an etch craft: the scroll becomes a permanent book spell."""
+        needs, self.pending_etch = self.pending_etch, None
+        if needs is None:
+            return False
+        p = self.player
+        book = p.spellbook()
+        if item is None or item.kind != "scroll" or book is None:
+            self.msg("You set the burin down, nothing etched.")
+            return False
+        if not self.is_identified(item):
+            self.msg("You can't etch glyphs you don't yet understand.")
+            return False
+        if item.subtype in book.contents:
+            self.msg(f"The spell of {item.subtype} is already in your book.")
+            return False
+        if len(book.contents) >= 6:
+            self.msg("Your spellbook is full — six spells, no more.")
+            return False
+        self._consume_materials(needs)
+        p.remove_one(item)
+        book.contents[item.subtype] = 1
+        p.book_studied = False
+        self.msg(f"You etch the spell of {item.subtype} into your "
+                 f"spellbook ({len(book.contents)}/6). "
+                 "Rest (.) to commit spells to memory.")
         self._gain_craft_exp(needs)
         return True
 
@@ -840,8 +953,10 @@ class Game:
         if p.mana < spell.mana:
             self.msg("You haven't the strength of mind for that spell.")
             return False
-        effect = getattr(self, "_sp_" + spell.key)
-        ok = effect()
+        if spell.key.startswith("scroll:"):
+            ok = self._scroll_effect(spell.key[7:])
+        else:
+            ok = getattr(self, "_sp_" + spell.key)()
         if ok:
             p.mana -= spell.mana
         return ok

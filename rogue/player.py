@@ -3,7 +3,7 @@
 import random
 import string
 
-from .classes import SUN_CANTRIP
+from .classes import SUN_CANTRIP, SCROLL_SPELL_MANA, Spell
 from .items import make_weapon, make_armor, make_food, make_bag, Item, RANGED
 from .rng import roll
 
@@ -63,6 +63,8 @@ class Player:
         self.craft_exp = 0
         self.knows_taming = ("taming" in cclass.traits
                              or "taming" in race.traits)
+        self.memorized = []       # scroll-spells held in mind (max 3)
+        self.book_studied = True  # False = the book has unstudied changes
 
         self.max_mana = self._mana_max()
         self.mana = self.max_mana
@@ -171,10 +173,23 @@ class Player:
         """Total craft experience needed to attain craftsman level lvl."""
         return 50 * lvl * (lvl - 1)
 
+    def is_arcane(self):
+        """Arcane (Int-based) casters work scroll-craft and spellbooks."""
+        return self.cclass.mana_stat == "Int"
+
+    def spellbook(self):
+        return next((it for it in self.inventory
+                     if it.kind == "spellbook"), None)
+
     def known_spells(self):
         spells = [s for s in self.cclass.spells if s.level <= self.level]
         if "cantrip" in self.race.traits:
             spells.insert(0, SUN_CANTRIP)
+        if self.is_arcane():
+            for sub in self.memorized:
+                spells.append(Spell("scroll:" + sub,
+                                    f"{sub.title()} (book)", 1,
+                                    SCROLL_SPELL_MANA.get(sub, 8)))
         return spells
 
     # -- inventory ---------------------------------------------------------

@@ -123,6 +123,14 @@ SPECIAL_PARTS = {
     "skeleton": ("bone", 0.75),
     "fire drake": ("drake hide", 0.65),
     "ancient dragon": ("dragon hide", 0.65),
+    "giant centipede": ("gall gland", 0.60),  # the inkmaker's friend
+    # All fowl shed feathers generously — the scribe's first harvest
+    "hen": ("feather", 0.75),
+    "rooster": ("feather", 0.75),
+    "duck": ("feather", 0.75),
+    "goose": ("feather", 0.75),
+    "cockatrice": ("feather", 0.70),
+    "phoenix": ("feather", 0.70),
 }
 
 
@@ -178,6 +186,13 @@ class Monster:
 # They spawn at any depth and scale with it — a deep wolf is a dire wolf.
 ANIMAL_TYPES = {
     "forest": [
+        MonsterType("duck", "a", 1, "1d4", 12, "1d2", 2, 1, 99,
+                    _f("tameable", "beast"), genus="fowl", diet="omnivore"),
+        MonsterType("goose", "a", 1, "1d6", 12, "1d3", 3, 1, 99,
+                    _f("tameable", "beast"), genus="fowl", diet="omnivore"),
+        MonsterType("phoenix", "a", 8, "6d8", 16, "2d6", 90, 1, 99,
+                    _f("tameable", "beast", "regen"),
+                    genus="fowl", diet="carnivore"),
         MonsterType("wolf", "C", 2, "2d6", 13, "1d6", 10, 1, 99,
                     _f("tameable", "beast", "pack", "fangs"),
                     genus="canine", diet="carnivore"),
@@ -191,6 +206,13 @@ ANIMAL_TYPES = {
                     _f("tameable", "beast"), genus="cervine", diet="herbivore"),
     ],
     "savannah": [
+        MonsterType("hen", "a", 1, "1d4", 12, "1d2", 2, 1, 99,
+                    _f("tameable", "beast"), genus="fowl", diet="herbivore"),
+        MonsterType("rooster", "a", 1, "1d6", 12, "1d3", 3, 1, 99,
+                    _f("tameable", "beast"), genus="fowl", diet="omnivore"),
+        MonsterType("cockatrice", "a", 4, "3d8", 14, "1d6", 35, 1, 99,
+                    _f("tameable", "beast", "poison"),
+                    genus="fowl", diet="carnivore"),
         MonsterType("lion", "f", 5, "4d8", 14, "2d6", 40, 1, 99,
                     _f("tameable", "beast", "fangs"),
                     genus="feline", diet="carnivore"),

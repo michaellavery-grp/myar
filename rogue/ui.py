@@ -412,7 +412,9 @@ def craft_screen(scr, game, colors):
             _addstr(scr, 4 + k, 16, extra)
         top = 4 + len(mat_lines)
         makeable = [(i, r) for i, r in enumerate(RECIPES)
-                    if game.can_craft(r)]
+                    if game.can_craft(r)
+                    and not (r[2] in ("copy_scroll", "etch_scroll", "spellbook")
+                             and not game.player.is_arcane())]
         if not makeable:
             _addstr(scr, top, 4, "You lack the materials to make anything "
                     "here. Go hunting.", curses.A_DIM)
@@ -429,7 +431,14 @@ def craft_screen(scr, game, colors):
             return False
         j = c - ord("a")
         if 0 <= j < len(makeable):
-            return game.do_craft(makeable[j][0])
+            crafted = game.do_craft(makeable[j][0])
+            if game.pending_copy is not None or game.pending_etch is not None:
+                verb = "copy" if game.pending_copy is not None else "etch"
+                it = select_item(scr, game, colors, ("scroll",), verb)
+                if game.pending_copy is not None:
+                    return game.copy_scroll(it)
+                return game.etch_scroll(it)
+            return crafted
 
 
 def trade_screen(scr, game, colors):
@@ -481,6 +490,58 @@ def trade_screen(scr, game, colors):
         msgs = game.drain_msgs()
         if msgs:
             note = " ".join(msgs)
+
+
+def _resolve_identify(scr, game, colors):
+    if not game.pending_identify:
+        return
+    draw(scr, game, colors)
+    show_messages(scr, game, colors)
+    target = select_item(scr, game, colors, (), "identify")
+    if target:
+        game.identify_chosen(target)
+    else:
+        game.pending_identify = False
+
+
+def study_menu(scr, game, colors):
+    """Choose up to 3 spells from the etched spellbook to hold in mind."""
+    from .classes import SCROLL_SPELL_MANA
+    p = game.player
+    game.offer_study = False
+    p.book_studied = True
+    book = p.spellbook()
+    if book is None or not book.contents:
+        return
+    etched = sorted(book.contents)
+    selected = [s for s in p.memorized if s in etched]
+    while True:
+        _overlay_box(scr, len(etched) + 3,
+                     " Study spellbook — pick up to 3 "
+                     "(letters toggle, ENTER done, ESC keep old) ")
+        for i, sub in enumerate(etched):
+            mark = "*" if sub in selected else " "
+            _addstr(scr, 2 + i, 4,
+                    f"{chr(ord('a') + i)}) [{mark}] {sub}"
+                    f"  [{SCROLL_SPELL_MANA.get(sub, 8)} mana]")
+        _addstr(scr, 2 + len(etched), 4,
+                f"in memory: {len(selected)}/3")
+        scr.refresh()
+        c = scr.getch()
+        if c == 27:  # keep previous memorization
+            return
+        if c in (10, 13):
+            p.memorized = selected
+            game.msg("The spells settle into your mind." if selected
+                     else "You close the book, mind calm and empty.")
+            return
+        i = c - ord("a")
+        if 0 <= i < len(etched):
+            sub = etched[i]
+            if sub in selected:
+                selected.remove(sub)
+            elif len(selected) < 3:
+                selected.append(sub)
 
 
 def show_help(scr):
@@ -703,22 +764,19 @@ def handle_key(scr, game, colors, c):
         it = select_item(scr, game, colors, ("potion",), "quaff")
         return game.quaff(it) if it else False
     if ch == "r":
-        it = select_item(scr, game, colors, ("scroll",), "read")
+        it = select_item(scr, game, colors, ("scroll", "spellbook"), "read")
         if not it:
             return False
         consumed = game.read(it)
-        if game.pending_identify:
-            draw(scr, game, colors)
-            show_messages(scr, game, colors)
-            target = select_item(scr, game, colors, (), "identify")
-            if target:
-                game.identify_chosen(target)
-            else:
-                game.pending_identify = False
+        _resolve_identify(scr, game, colors)
         return consumed
     if ch == "z":
         sp = select_spell(scr, game, colors)
-        return game.cast(sp) if sp else False
+        if not sp:
+            return False
+        consumed = game.cast(sp)
+        _resolve_identify(scr, game, colors)  # Identify cast from the book
+        return consumed
     if ch == "w":
         it = select_item(scr, game, colors, ("weapon",), "wield")
         return game.wield(it) if it else False
@@ -790,6 +848,10 @@ def main(stdscr):
                         draw(stdscr, game, colors)
                         show_messages(stdscr, game, colors)
                         allocate_stats_overlay(stdscr, game, colors)
+                    if game.offer_study:
+                        draw(stdscr, game, colors)
+                        show_messages(stdscr, game, colors)
+                        study_menu(stdscr, game, colors)
                     while game.player.food <= 0 and game.player.food > -100:
                         # fainting: may lose turns
                         from .rng import chance as _ch
