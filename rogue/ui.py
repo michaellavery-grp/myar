@@ -40,7 +40,8 @@ HELP_TEXT = """\
   w         wield weapon         W   wear armor
   T         take off armor       d   drop item
   c         charge (Minotaur)    C   craft (on a = table)
-  t         tame a beast (needs pet food)
+  t         tame a beast (needs pet food); aimed at your
+            own companion, releases it into the wild
   S         save game and exit   Q   quit (no save)
   ?         this help
 
@@ -689,9 +690,16 @@ def handle_key(scr, game, colors, c):
                 colors.pair(6, bold=True))
         scr.refresh()
         c2 = scr.getch()
-        if c2 in MOVE_KEYS:
-            return game.tame(*MOVE_KEYS[c2])
-        return False
+        if c2 not in MOVE_KEYS:
+            return False
+        dx, dy = MOVE_KEYS[c2]
+        m = game.level.monster_at(game.player.x + dx, game.player.y + dy)
+        if m is not None and m is game.pet:
+            if confirm(scr, colors,
+                       f"Release your {m.name} back into the wild? (y/n)"):
+                return game.release_pet()
+            return False
+        return game.tame(dx, dy)
     if ch == "e":
         it = select_item(scr, game, colors, ("food",), "eat")
         return game.eat(it) if it else False

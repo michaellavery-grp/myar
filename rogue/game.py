@@ -597,7 +597,8 @@ class Game:
             self.msg(f"The {m.name} is already yours, heart and hide.")
             return False
         if self.pet is not None:
-            self.msg("You can only handle one companion at a time.")
+            self.msg("You can only handle one companion at a time. "
+                     f"(Press t toward your {self.pet.name} to release it.)")
             return False
         food = next((it for it in p.inventory
                      if it.kind == "food" and it.subtype == "pet food"), None)
@@ -616,6 +617,18 @@ class Game:
             self._check_level_up()
         else:
             self.msg(f"The {m.name} snatches the food and shies away.")
+        return True
+
+    def release_pet(self):
+        """Set your companion free. It leaves as a friend, not a stranger."""
+        pet = self.pet
+        if pet is None:
+            return False
+        pet.tamed = False
+        pet.attitude = "friendly"
+        self.pet = None
+        self.msg(f"You scratch the {pet.name} behind the ears and let it "
+                 "go. It lingers a moment, then pads away, free.")
         return True
 
     def exit_direction(self):

@@ -306,6 +306,10 @@ Morgoth holds the Amulet of Yendor.
   monsters (kills credit you), swaps places when you bump into it, rides
   trapdoors and staircases with you when within 2 tiles — or waits
   faithfully on the old level. It appears on your `@` sheet with its HP.
+- **Releasing:** press `t` toward your own companion and confirm. It
+  returns to the wild as a *friend* — it won't attack, and you can tame
+  it again later. Found a lion you like better than your antelope? Set
+  the antelope free first.
 - Animals **scale with depth** — a wolf tamed at 3,000 feet is a dire
   companion. Pets can die; monsters will snap back at them. Your spells
   and arrows will never target your own companion.

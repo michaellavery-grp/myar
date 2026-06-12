@@ -480,7 +480,29 @@ def test_taming():
                 break
     except GameOver:
         pass
-    print("ok  taming: learn paths, tame, pet follows and fights")
+
+    # Release the wolf, then a lion takes its place
+    pet = g.pet
+    assert g.release_pet()
+    assert g.pet is None and not pet.tamed
+    assert pet.attitude == "friendly"  # parted as friends, re-tameable
+    g.level.monsters = [m for m in g.level.monsters
+                        if m is not pet and m is not foe]
+    lion_t = next(t for t in ANIMAL_TYPES["savannah"] if t.name == "lion")
+    d = next(dd for dd in ((1, 0), (-1, 0), (0, 1), (0, -1))
+             if not g.level.monster_at(p.x + dd[0], p.y + dd[1]))
+    lion = M(lion_t, p.x + d[0], p.y + d[1], g.depth)
+    lion.asleep = False
+    lion.attitude = "wary"
+    g.level.monsters.append(lion)
+    g.player.add_item(make_pet_food())
+    game_mod.chance = lambda c: True
+    try:
+        assert g.tame(*d)
+    finally:
+        game_mod.chance = real_chance
+    assert g.pet is lion and lion.tamed
+    print("ok  taming: learn paths, tame, fight, release, tame anew")
 
 
 def test_biomes_and_animals():
@@ -668,7 +690,7 @@ def test_trader():
     lvl = g.level
     assert lvl.trader_pos is not None, "no trader on depth 3"
     assert lvl.trader_stock, "trader has no stock"
-    assert lvl.tile(*lvl.trader_pos) in ".#+", "trader on bad tile"
+    assert lvl.tile(*lvl.trader_pos) in (".", '"', "'"), "trader on bad tile"
     # Trader is not a monster: nothing to attack, spells can't target it
     assert lvl.monster_at(*lvl.trader_pos) is None
     # Bumping into the trader requests a trade, consumes no turn
