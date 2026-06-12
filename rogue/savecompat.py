@@ -112,6 +112,15 @@ def migrate_game(game):
         _ensure(game, "trade_requested", False)
         _ensure(game, "pet", None)
 
+        # v9: fanged monsters now shed teeth. Back-pay for every fang the
+        # old algorithm swallowed: six monster teeth, on the house.
+        if old < 9:
+            bag = p.bag()
+            if bag is not None:
+                bag.contents["teeth"] = bag.contents.get("teeth", 0) + 6
+                game.msg("(Six monster teeth settle into your crafting "
+                         "bag — fanged foes now shed them.)")
+
         for lvl in game.levels.values():
             _ensure(lvl, "crafting_table", None)
             _ensure(lvl, "trader_pos", None)

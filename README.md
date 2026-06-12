@@ -227,30 +227,35 @@ color-rendered version.
 
 ### Monsters (hostile)
 
+Anything marked **fangs** has an independent chance to shed **monster
+teeth** on death, stacking with all its other drops — one orc can yield
+gold, gear, an ear *and* teeth from a single kill. Fanged animals
+(wolves, panthers, boars, lions, hyenas) shed them too.
+
 | Letter | Monster | Depths | Notes |
 |:------:|---------|:------:|-------|
-| `r` | giant rat | 1–6 | drops rat tails |
-| `b` | bat | 1–8 | erratic flight; drops bat eyes |
-| `k` | kobold | 1–7 | humanoid; drops kobold tails |
-| `j` | jackal | 1–6 | hunts in packs |
-| `s` | snake | 2–11 | poison; drops venom glands |
-| `g` | goblin | 2–12 | humanoid |
+| `r` | giant rat | 1–6 | fangs; drops rat tails |
+| `b` | bat | 1–8 | erratic flight, fangs; drops bat eyes |
+| `k` | kobold | 1–7 | humanoid, fangs; drops kobold tails |
+| `j` | jackal | 1–6 | hunts in packs, fangs |
+| `s` | snake | 2–11 | poison, fangs; drops venom glands |
+| `g` | goblin | 2–12 | humanoid, fangs |
 | `S` | skeleton | 2–20 | undead; drops bones |
-| `o` | orc | 3–16 | humanoid, carries gold; drops orc ears |
+| `o` | orc | 3–16 | humanoid, carries gold, fangs; drops orc ears |
 | `z` | zombie | 4–16 | undead, mindless |
-| `H` | hobgoblin | 5–18 | humanoid |
+| `H` | hobgoblin | 5–18 | humanoid, fangs |
 | `c` | giant centipede | 5–18 | poison |
 | `W` | wight | 7–22 | undead |
-| `O` | ogre | 8–26 | humanoid, carries gold |
-| `T` | cave troll | 10–34 | humanoid, regenerates |
+| `O` | ogre | 8–26 | humanoid, carries gold, fangs |
+| `T` | cave troll | 10–34 | humanoid, regenerates, fangs |
 | `w` | wraith | 12–40 | undead |
-| `V` | vampire | 14–48 | undead, regenerates |
+| `V` | vampire | 14–48 | undead, regenerates, fangs |
 | `P` | stone giant | 15–55 | humanoid, carries gold |
 | `L` | lich | 22–70 | undead |
-| `d` | fire drake | 25–75 | drops drake hides |
+| `d` | fire drake | 25–75 | fangs; drops drake hides |
 | `B` | balrog | 30–85 | of Morgoth's brood |
-| `&` | greater demon | 40–99 | |
-| `D` | ancient dragon | 50–99 | carries gold; drops dragon hides |
+| `&` | greater demon | 40–99 | fangs |
+| `D` | ancient dragon | 50–99 | carries gold, fangs; drops dragon hides |
 | `P` | titan | 60–99 | humanoid, carries gold |
 
 ### Bosses (every 5th level — red on screen)

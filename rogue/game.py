@@ -1117,6 +1117,12 @@ class Game:
                 self.level.items.setdefault(pos, []).append(drop)
                 self.msg(f"You cut {self.item_name(drop)} from the "
                          f"{mon.name}.")
+            # Fangs shed teeth — independent of (stacking with) all other
+            # drops: an orc can yield gold, gear, an ear AND teeth.
+            if "fangs" in flags and chance(0.3):
+                drop = make_material("teeth")
+                self.level.items.setdefault(pos, []).append(drop)
+                self.msg(f"You pry sharp teeth from the {mon.name}'s jaw.")
         if pos in self.level.items and pos in self.level.visible:
             self.level.seen_items.add(pos)
 

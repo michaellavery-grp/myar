@@ -167,13 +167,13 @@ def bestiary_monsters():
         "erratic": "erratic flight", "poison": "poison",
         "regen": "regenerates", "undead": "undead", "pack": "packs",
         "gold": "carries gold", "humanoid": "humanoid",
-        "mindless": "mindless",
+        "mindless": "mindless", "fangs": "sheds teeth",
     }
     rows = []
     for t in MONSTERS:
         tags = [notes[f] for f in
                 ("humanoid", "undead", "mindless", "poison", "regen",
-                 "erratic", "pack", "gold") if f in t.flags]
+                 "erratic", "pack", "gold", "fangs") if f in t.flags]
         part = SPECIAL_PARTS.get(t.name)
         if part:
             tags.append(f"drops {part[0]}s")

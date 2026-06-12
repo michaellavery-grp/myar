@@ -259,7 +259,8 @@ def test_drops():
             assert subs & {"skin", "teeth", "hide"}, (beast, subs)
             assert part in subs, (beast, subs)
 
-        # Humanoids with signature parts: orc ears, kobold tails
+        # Humanoids with signature parts AND fangs: an orc kill stacks
+        # gear/gold + an ear + teeth, all from one corpse
         for foe, part in (("orc", "orc ear"), ("kobold", "kobold tail")):
             g = Game("Trophy", _race("Human"), _cclass("Fighter"))
             g.player.level, g.player.stats["Str"] = 10, 18
@@ -269,8 +270,20 @@ def test_drops():
                 g.attack(m)
             drops = g.level.items.get(pos, [])
             assert any(i.kind != "material" for i in drops), foe  # gear/gold
-            assert any(i.kind == "material" and i.subtype == part
-                       for i in drops), foe
+            subs = {i.subtype for i in drops if i.kind == "material"}
+            assert part in subs, (foe, subs)
+            assert "teeth" in subs, f"{foe} shed no teeth: {subs}"
+
+        # Vampire: undead, so no flesh — but those fangs drop
+        g = Game("VanHelsing", _race("Human"), _cclass("Fighter"))
+        g.player.level, g.player.stats["Str"] = 20, 18
+        m = _spawn_adjacent(g, "vampire")
+        pos = (m.x, m.y)
+        while m in g.level.monsters:
+            g.attack(m)
+        subs = {i.subtype for i in g.level.items.get(pos, [])
+                if i.kind == "material"}
+        assert subs == {"teeth"}, subs
 
         # Skeletons: bones, and nothing fleshy
         g = Game("Gravedigger", _race("Human"), _cclass("Fighter"))
@@ -613,11 +626,16 @@ def test_user_save_fixture():
 
     mats_before = _materials(g.player)
     gold_before = g.player.gold
+    old_version = getattr(g, "save_version", 0)
     from .savecompat import migrate_game
     g = migrate_game(g)
     assert g is not None, "save migration failed"
-    assert _materials(g.player) == mats_before, \
-        "migration altered crafting materials"
+    mats_after = _materials(g.player)
+    expected = dict(mats_before)
+    if old_version < 9:  # teeth back-pay for the fang fix
+        expected["teeth"] = expected.get("teeth", 0) + 6
+    assert mats_after == expected, \
+        f"migration altered materials: {mats_before} -> {mats_after}"
     assert g.player.gold == gold_before, "migration altered gold"
     from . import SAVE_VERSION
     assert g.save_version == SAVE_VERSION
