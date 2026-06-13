@@ -225,14 +225,22 @@ ANIMAL_TYPES = {
 }
 
 
-def make_animal(biome, depth):
-    """A wild animal for a biome room; peaceful unless it eats meat."""
-    mtype = random.choice(ANIMAL_TYPES[biome])
+def _animal_from_type(mtype, depth):
     m = Monster(mtype, 0, 0, depth)
     m.asleep = False
     m.attitude = ("friendly" if mtype.diet in ("omnivore", "herbivore")
                   else "wary")
     return m
+
+
+def make_animal(biome, depth):
+    """A wild animal for a biome room; peaceful unless it eats meat."""
+    return _animal_from_type(random.choice(ANIMAL_TYPES[biome]), depth)
+
+
+def make_same_animal(mtype, depth):
+    """Another of the same kind — for flocks and packs."""
+    return _animal_from_type(mtype, depth)
 
 
 def choose_type(depth):

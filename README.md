@@ -253,8 +253,9 @@ color-rendered version.
 | `a` | rooster | savannah | fowl | omnivore | friendly |
 | `a` | cockatrice | savannah | fowl | carnivore | wary |
 
-All fowl shed **feathers**; the phoenix regenerates and makes a
-spectacular companion.
+All fowl shed **feathers** and spawn in **flocks** of 2–4 (birds of a
+feather…), so a single biome room can stock a scribe for levels. The
+phoenix regenerates and makes a spectacular companion.
 
 ### Monsters (hostile)
 

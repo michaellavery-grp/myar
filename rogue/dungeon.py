@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from . import MAP_W, MAP_H, MAX_DEPTH, BOSS_EVERY
 from .rng import chance
 from .items import rand_item, make_gold, make_food
-from .monsters import Monster, choose_type, make_boss, make_animal
+from .monsters import (Monster, choose_type, make_boss, make_animal,
+                       make_same_animal)
 
 GRID = 3
 CELL_W = MAP_W // GRID       # 26
@@ -333,7 +334,8 @@ def _populate(lvl):
             kinds = TRAP_KINDS if depth < MAX_DEPTH else TRAP_KINDS[:3]
             lvl.traps[spot] = Trap(random.choice(kinds))
 
-    # Wild animals roam the biome rooms, peaceable until provoked
+    # Wild animals roam the biome rooms, peaceable until provoked.
+    # Birds of a feather flock together — fowl arrive 2-4 at a time.
     for room in lvl.rooms:
         if room.gone or not room.biome:
             continue
@@ -345,6 +347,15 @@ def _populate(lvl):
             m = make_animal(room.biome, depth)
             m.x, m.y = random.choice(spots)
             lvl.monsters.append(m)
+            if m.type.genus == "fowl":
+                for _ in range(random.randint(1, 3)):  # the rest of the flock
+                    flock_spots = [t for t in room.floor_tiles()
+                                   if not lvl.monster_at(*t)]
+                    if not flock_spots:
+                        break
+                    bird = make_same_animal(m.type, depth)
+                    bird.x, bird.y = random.choice(flock_spots)
+                    lvl.monsters.append(bird)
 
     # A crafting table somewhere on every level
     spot = lvl.random_floor(avoid=lvl.stairs_up, min_dist=2)

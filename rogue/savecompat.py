@@ -15,7 +15,7 @@ from . import SAVE_VERSION
 from .classes import CLASSES
 from .dungeon import FLOOR, BIOME_FLOORS
 from .items import make_bag
-from .monsters import MONSTERS, make_animal
+from .monsters import MONSTERS, ANIMAL_TYPES, make_animal, make_same_animal
 from .races import RACES
 
 
@@ -69,6 +69,53 @@ def _wild_regrowth(lvl):
         a = make_animal(room.biome, lvl.depth)
         a.x, a.y = random.choice(spots)
         lvl.monsters.append(a)
+
+
+_FOWL = {t.name for ts in ANIMAL_TYPES.values() for t in ts
+         if t.genus == "fowl"}
+
+
+def _make_fowl(biome, depth):
+    """Spawn a fowl specifically (for retrofitting pre-v1.4 saves)."""
+    fowl_types = [t for t in ANIMAL_TYPES[biome] if t.genus == "fowl"]
+    for _ in range(12):
+        a = make_animal(biome, depth)
+        if a.type.name in _FOWL:
+            return a
+    # Fallback: build directly from the first fowl type
+    from .monsters import Monster
+    t = fowl_types[0]
+    a = Monster(t, 0, 0, depth)
+    a.asleep = False
+    a.attitude = ("friendly" if t.diet in ("omnivore", "herbivore")
+                  else "wary")
+    return a
+
+
+def _seed_fowl(lvl):
+    """Pre-v1.4 levels were generated without fowl. Let some birds in:
+    every biome room with no fowl gets one, so existing saves can find
+    the scribe's feathers without descending to fresh levels."""
+    biome_rooms = [r for r in lvl.rooms if not r.gone and r.biome]
+    for room in biome_rooms:
+        has_fowl = any(m.type.name in _FOWL and room.contains(m.x, m.y)
+                       for m in lvl.monsters)
+        if has_fowl:
+            continue
+        spots = [t for t in room.floor_tiles() if not lvl.monster_at(*t)]
+        if spots:
+            a = _make_fowl(room.biome, lvl.depth)
+            a.x, a.y = random.choice(spots)
+            lvl.monsters.append(a)
+            # Birds of a feather — settle a small flock of the same kind
+            for _ in range(random.randint(1, 2)):
+                free = [t for t in room.floor_tiles()
+                        if not lvl.monster_at(*t)]
+                if not free:
+                    break
+                bird = make_same_animal(a.type, lvl.depth)
+                bird.x, bird.y = random.choice(free)
+                lvl.monsters.append(bird)
 
 
 def migrate_game(game):
@@ -143,6 +190,14 @@ def migrate_game(game):
                 _patch_item(it)
             if old < 7:
                 _wild_regrowth(lvl)
+            if old < 12:
+                _seed_fowl(lvl)  # birds came in v1.4; retrofit old levels
+
+        if old < 12 and any(
+                any(m.type.name in _FOWL for m in lvl.monsters)
+                for lvl in game.levels.values()):
+            game.msg("(Fowl have come to roost in your wild rooms — look "
+                     "for the birds, scribe.)")
 
         game.save_version = SAVE_VERSION
         game.msg(f"(Your save was carried forward from version {old} "

@@ -10,7 +10,8 @@ from .items import (POTION_SUBTYPES, SCROLL_SUBTYPES, POTION_COLORS,
                     make_material, make_weapon, make_armor, rand_item,
                     item_value, MATERIALS, RECIPES, WEAPON_DEFS, RANGED)
 from .items import Item
-from .monsters import Monster, choose_type, SPECIAL_PARTS, make_animal
+from .monsters import (Monster, choose_type, SPECIAL_PARTS, make_animal,
+                       make_same_animal)
 from .player import Player, MAX_FOOD
 from .rng import roll, chance
 
@@ -1418,6 +1419,16 @@ class Game:
                 m = make_animal(room.biome, self.depth)
                 m.x, m.y = random.choice(spots)
                 self.level.monsters.append(m)
+                if m.type.genus == "fowl":  # a flock wanders in together
+                    for _ in range(random.randint(1, 3)):
+                        free = [t for t in room.floor_tiles()
+                                if not self.level.monster_at(*t)
+                                and t != (self.player.x, self.player.y)]
+                        if not free:
+                            break
+                        bird = make_same_animal(m.type, self.depth)
+                        bird.x, bird.y = random.choice(free)
+                        self.level.monsters.append(bird)
                 return
         spot = self.level.random_floor(avoid=(self.player.x, self.player.y),
                                        min_dist=10)

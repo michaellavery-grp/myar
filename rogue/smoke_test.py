@@ -757,6 +757,54 @@ def test_fowl():
     print("ok  fowl: six birds, feather drops, centipede gall glands")
 
 
+def test_fowl_flocking_and_retrofit():
+    """Fowl spawn in flocks, and pre-v1.4 saves get birds retrofitted."""
+    from collections import Counter
+    fowl = {"hen", "rooster", "duck", "goose", "cockatrice", "phoenix"}
+
+    # Flocking: across many levels, fowl rooms hold multiple same-species
+    flock_sizes = []
+    for seed in range(120):
+        random.seed(9000 + seed)
+        lvl = gen_level(3)
+        by_room = {}
+        for m in lvl.monsters:
+            if m.type.name in fowl:
+                room = lvl.room_at(m.x, m.y)
+                if room is not None:
+                    by_room.setdefault(id(room), Counter())[m.type.name] += 1
+        for counts in by_room.values():
+            flock_sizes.append(max(counts.values()))
+    assert flock_sizes, "no fowl spawned at all"
+    avg = sum(flock_sizes) / len(flock_sizes)
+    assert avg >= 2.0, f"fowl not flocking (avg same-species cluster {avg:.2f})"
+
+    # Retrofit: a pre-fowl cached level gains birds on migration.
+    # Build a level the way an old save would have — animals, no fowl.
+    from .savecompat import migrate_game
+    from . import SAVE_VERSION
+    random.seed(123)
+    g = Game("OldTimer", _race("Human"), _cclass("Wizard"))
+    lvl = gen_level(3)
+    # Strip every fowl to simulate a level generated before v1.4
+    lvl.monsters = [m for m in lvl.monsters if m.type.name not in fowl]
+    biome_rooms = [r for r in lvl.rooms if not r.gone and r.biome]
+    if not biome_rooms:  # ensure at least one biome room to seed into
+        room = next(r for r in lvl.rooms if not r.gone)
+        room.biome = "forest"
+        biome_rooms = [room]
+    g.levels = {3: lvl}
+    g.save_version = 11        # pre-fowl-retrofit
+    before = sum(1 for m in lvl.monsters if m.type.name in fowl)
+    assert before == 0
+    g = migrate_game(g)
+    assert g is not None and g.save_version == SAVE_VERSION
+    after = sum(1 for m in g.levels[3].monsters if m.type.name in fowl)
+    assert after >= len(biome_rooms), \
+        f"retrofit seeded {after} fowl for {len(biome_rooms)} biome rooms"
+    print(f"ok  fowl flocking (avg {avg:.1f}/flock) + pre-v1.4 retrofit")
+
+
 def test_drop_balance():
     """Tails must flow generously enough to keep soup on the menu."""
     from collections import Counter
@@ -901,6 +949,7 @@ if __name__ == "__main__":
     test_pet_food_scraps()
     test_scrollcraft()
     test_fowl()
+    test_fowl_flocking_and_retrofit()
     test_drop_balance()
     test_taming()
     test_message_wrapping()
