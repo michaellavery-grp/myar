@@ -46,6 +46,7 @@ class Player:
         self.stats = dict(stats) if stats else roll_stats(race)
         self.max_str = self.stats["Str"]
         self.level = 1
+        self.max_level_reached = 1
         self.exp = 0
         self.gold = 20 + roll("2d20") + self.stats["Cha"]
         self.max_hp = race.hit_die + cclass.hit_die // 2 + max(0, self.mod("Con"))
@@ -57,6 +58,10 @@ class Player:
         self.armor = None
         self.haste = 0
         self.invis = 0
+        self.blessed = 0      # turns of divine favor (+to-hit, +AC)
+        self.confused = 0     # turns of staggering (spores, gas)
+        self.temp_hp = 0      # transient hit points from prayer
+        self.tithe_total = 0  # lifetime gold given to the temples
         self.has_amulet = False
         self.raging = False
         self.craft_level = 1
@@ -104,7 +109,18 @@ class Player:
             base += self.armor.ac + self.armor.ac_ench
         if self.race.name == "Fairy":
             base += 3
+        if self.blessed > 0:
+            base += 1
         return base
+
+    TITHE_TIERS = (0, 250, 1000, 5000)  # gold thresholds for levels 0-3
+
+    def tithe_level(self):
+        lvl = 0
+        for i, threshold in enumerate(self.TITHE_TIERS):
+            if self.tithe_total >= threshold:
+                lvl = i
+        return lvl
 
     def hunger_state(self):
         if self.food <= 0:
@@ -129,7 +145,13 @@ class Player:
             b += self.weapon.hit_ench
         if self.rage_active():
             b += 2
+        if self.blessed > 0:
+            b += 1
         return b
+
+    def weapon_is_magical(self):
+        w = self.weapon
+        return w is not None and (w.hit_ench > 0 or w.dmg_ench > 0)
 
     def damage_roll(self):
         if self.weapon and self.weapon.subtype not in RANGED:

@@ -13,6 +13,15 @@ Flags:
               (beasts and the like instead may drop skin, teeth or hide)
     fangs     sharp teeth — an independent chance to drop monster teeth,
               stacking with every other drop
+    incorporeal  a ghost: half of all mundane blows pass through it;
+                 a magical (enchanted) weapon or any spell negates this
+    needs_magic  only enchanted weapons or spells harm it at all
+    drain_level  its touch drains a character level (restore at a temple)
+    spineless    a boneless thing — mindless, and immune to confusion
+    acid         its body corrodes the armor of whoever it strikes
+    spores       its attack may loose confusing spores
+    slow         acts only every other turn
+    ferocious    hits especially hard for its depth
 """
 
 import random
@@ -64,11 +73,28 @@ MONSTERS = [
     MonsterType("giant centipede", "c", 4, "3d6", 15, "1d3", 25, 5, 18,
                 _f("poison")),
     MonsterType("wight", "W", 5, "5d8", 15, "1d8", 45, 7, 22, _f("undead")),
+    MonsterType("ghost", "G", 6, "5d8", 15, "1d8", 60, 6, 30,
+                _f("undead", "incorporeal")),
+    MonsterType("gnoll", "N", 4, "4d8", 14, "1d8", 32, 4, 18,
+                _f("humanoid", "fangs", "pack")),
+    MonsterType("ooze", "J", 3, "4d8", 10, "1d6", 22, 4, 25,
+                _f("spineless", "acid")),
+    MonsterType("myconoid", "F", 3, "3d8", 11, "1d4", 20, 3, 22,
+                _f("spineless", "spores", "slow")),
+    MonsterType("bugbear", "U", 5, "5d8", 14, "2d4", 48, 6, 24,
+                _f("humanoid")),
     MonsterType("ogre", "O", 6, "6d8", 14, "2d6", 70, 8, 26,
                 _f("gold", "humanoid", "fangs")),
     MonsterType("cave troll", "T", 7, "7d8", 15, "2d8", 110, 10, 34,
                 _f("regen", "humanoid", "fangs")),
-    MonsterType("wraith", "w", 8, "8d8", 16, "1d10", 150, 12, 40, _f("undead")),
+    MonsterType("wraith", "w", 8, "8d8", 16, "1d10", 150, 12, 40,
+                _f("undead", "needs_magic")),
+    MonsterType("owlbear", "Y", 7, "7d8", 15, "2d8", 120, 8, 30,
+                _f("beast", "fangs", "ferocious")),
+    MonsterType("gelatinous cube", "Q", 6, "9d8", 9, "2d6", 90, 8, 40,
+                _f("spineless", "acid", "slow")),
+    MonsterType("spectre", "Z", 10, "8d8", 17, "1d10", 260, 18, 55,
+                _f("undead", "incorporeal", "drain_level")),
     MonsterType("vampire", "V", 9, "9d8", 17, "2d8", 220, 14, 48,
                 _f("undead", "regen", "fangs")),
     MonsterType("stone giant", "P", 10, "10d8", 16, "3d6", 280, 15, 55,
@@ -124,6 +150,7 @@ SPECIAL_PARTS = {
     "fire drake": ("drake hide", 0.65),
     "ancient dragon": ("dragon hide", 0.65),
     "giant centipede": ("gall gland", 0.60),  # the inkmaker's friend
+    "owlbear": ("feather", 0.60),  # the owl half — a scribe's prize
     # All fowl shed feathers generously — the scribe's first harvest
     "hen": ("feather", 0.75),
     "rooster": ("feather", 0.75),

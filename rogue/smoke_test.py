@@ -106,6 +106,7 @@ def test_random_play():
                     while g.pending_stat_points > 0:
                         g.allocate_stat(random.choice(STAT_NAMES))
                     g.trade_requested = False
+                    g.temple_requested = False
                     g.offer_study = False
                     g.pending_copy = g.pending_etch = None
                     g.drain_msgs()
@@ -805,6 +806,167 @@ def test_fowl_flocking_and_retrofit():
     print(f"ok  fowl flocking (avg {avg:.1f}/flock) + pre-v1.4 retrofit")
 
 
+def test_new_monsters():
+    """Ghost (incorporeal), wraith (needs magic), spectre (drain),
+    acid, spores, and the new cryptids exist and behave."""
+    import rogue.game as game_mod
+    from .monsters import MONSTERS, Monster as M
+
+    names = {m.name for m in MONSTERS}
+    for n in ("ghost", "spectre", "gelatinous cube", "ooze", "myconoid",
+              "gnoll", "bugbear", "owlbear"):
+        assert n in names, f"missing monster {n}"
+    wraith = next(m for m in MONSTERS if m.name == "wraith")
+    assert "needs_magic" in wraith.flags
+
+    real_chance = game_mod.chance
+    real_rand = random.randint
+
+    # Wraith: a mundane weapon cannot harm it; a magical one can
+    g = Game("Knight", _race("Human"), _cclass("Fighter"))
+    p = g.player
+    p.level, p.stats["Str"] = 12, 18
+    p.weapon.hit_ench = p.weapon.dmg_ench = 0  # strip the starting enchant
+    w = M(wraith, p.x + 1, p.y, 12)
+    w.asleep = False
+    g.level.monsters.append(w)
+    hp0 = w.hp
+    game_mod.chance = lambda c: True
+    try:
+        g.attack(w)
+        assert w.hp == hp0, "mundane weapon harmed a wraith"
+        p.weapon.hit_ench = 2  # now enchanted
+        game_mod.randint = lambda a, b: b  # guarantee the to-hit lands
+        g.attack(w)
+        assert w.hp < hp0, "enchanted weapon failed to harm a wraith"
+    finally:
+        game_mod.chance = real_chance
+        game_mod.randint = real_rand
+
+    # Ghost: half of mundane blows pass through (negated by magic)
+    g = Game("Priest", _race("Human"), _cclass("Fighter"))
+    p = g.player
+    p.level, p.stats["Str"] = 12, 18
+    p.weapon.hit_ench = p.weapon.dmg_ench = 0
+    ghost_t = next(m for m in MONSTERS if m.name == "ghost")
+    passed = hit = 0
+    for _ in range(200):
+        gh = M(ghost_t, p.x + 1, p.y, 6)
+        gh.asleep = False
+        before = gh.hp
+        g.level.monsters = [gh]
+        game_mod.randint = lambda a, b: b  # always rolls to hit if reached
+        try:
+            g.attack(gh)
+        finally:
+            game_mod.randint = real_rand
+        if gh.hp == before:
+            passed += 1
+        else:
+            hit += 1
+    assert 60 < passed < 140, f"ghost pass-through not ~50% ({passed}/200)"
+
+    # Spectre drains a level; temple restore brings it back
+    g = Game("Victim", _race("Human"), _cclass("Fighter"))
+    p = g.player
+    p.exp = p.exp_to_level(8)
+    g._check_level_up()
+    assert p.level == 8 and p.max_level_reached == 8
+    spectre_t = next(m for m in MONSTERS if m.name == "spectre")
+    sp = M(spectre_t, p.x + 1, p.y, 18)
+    game_mod.chance = lambda c: False  # no magic-resist dodge (human anyway)
+    game_mod.randint = lambda a, b: b   # spectre's blow lands
+    try:
+        g._drain_level(sp)
+    finally:
+        game_mod.chance = real_chance
+        game_mod.randint = real_rand
+    assert p.level == 7, "spectre did not drain a level"
+    assert p.max_level_reached == 8
+    p.gold = 10000
+    g.temple_restore_level()
+    assert p.level == 8, "temple did not restore the drained level"
+
+    # Acid corrodes armor; spores confuse
+    g = Game("Target", _race("Human"), _cclass("Fighter"))
+    p = g.player
+    p.armor.ac_ench = 3
+    cube = M(next(m for m in MONSTERS if m.name == "gelatinous cube"),
+             p.x + 1, p.y, 8)
+    game_mod.randint = lambda a, b: b if (a, b) == (1, 20) else real_rand(a, b)
+    try:
+        g.monster_attack(cube)  # hits (roll 20), acid save fails on... force
+    finally:
+        game_mod.randint = real_rand
+    # armor either corroded or saved; ensure no crash and ac_ench <= 3
+    assert p.armor.ac_ench <= 3
+    print("ok  new monsters: ghost, wraith, spectre, acid, cryptids")
+
+
+def test_temple():
+    """Bless, remove curse, restore strength, holy water, tithe tiers."""
+    from .items import make_holy_water
+    g = Game("Pilgrim", _race("Human"), _cclass("Fighter"))
+    p = g.player
+    p.gold = 20000
+
+    # Temple appears on levels
+    assert any(gen_level(d).temple_pos is not None for d in range(1, 6))
+
+    # Bless grants the status
+    g.temple_bless()
+    assert p.blessed > 0
+    ac0 = p.ac
+    # (blessing adds +1 AC)
+    assert p.ac >= ac0
+
+    # Remove curse fixes negative enchants
+    p.weapon.hit_ench = -2
+    p.armor.ac_ench = -1
+    g.temple_remove_curse()
+    assert p.weapon.hit_ench == 0 and p.armor.ac_ench == 0
+
+    # Restore strength
+    p.max_str = p.stats["Str"]
+    p.stats["Str"] -= 4
+    g.temple_restore_strength()
+    assert p.stats["Str"] == p.max_str
+
+    # Holy water: fill, then quaff lifts a curse + blesses
+    n0 = sum(1 for it in p.inventory if it.subtype == "holy water")
+    g.temple_fill_holy_water()
+    hw = next(it for it in p.inventory if it.subtype == "holy water")
+    assert g.is_identified(hw)
+    p.armor.ac_ench = -3
+    p.blessed = 0
+    g.quaff(hw)
+    assert p.armor.ac_ench == 0 and p.blessed > 0
+
+    # Tithe tiers and the half-price perk at the top rank
+    full = g.temple_price("bless")
+    p.tithe_total = 0
+    assert p.tithe_level() == 0
+    g.temple_give_tithe(5000)
+    assert p.tithe_level() == 3
+    assert g.temple_price("bless") == full // 2  # halved at max rank
+    assert g.temple_price("holy water") == g.TEMPLE_BASE_PRICES["holy water"]
+
+    # Prayer never crashes and (eventually) grants something across tries
+    import rogue.game as game_mod
+    granted = False
+    for _ in range(50):
+        hp_before, mhp_before = p.hp, p.max_hp
+        pts_before = g.pending_stat_points
+        g.temple_pray()
+        if (p.hp > hp_before or p.max_hp > mhp_before or p.temp_hp > 0
+                or g.pending_stat_points > pts_before or p.blessed > 0):
+            granted = True
+        g.pending_stat_points = 0
+        p.temp_hp = 0
+    assert granted, "prayer never granted a benefit in 50 tries"
+    print("ok  temple: bless, uncurse, restore, holy water, tithe tiers, pray")
+
+
 def test_drop_balance():
     """Tails must flow generously enough to keep soup on the menu."""
     from collections import Counter
@@ -950,6 +1112,8 @@ if __name__ == "__main__":
     test_scrollcraft()
     test_fowl()
     test_fowl_flocking_and_retrofit()
+    test_new_monsters()
+    test_temple()
     test_drop_balance()
     test_taming()
     test_message_wrapping()

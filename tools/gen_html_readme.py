@@ -108,6 +108,8 @@ def render_level(lvl, player_pos=None):
         cells[pos] = (it.symbol, ITEM_CLASS.get(it.kind, "itm"))
     if lvl.trader_pos:
         cells[lvl.trader_pos] = ("$", "trader")
+    if lvl.temple_pos:
+        cells[lvl.temple_pos] = ("+", "tbl")  # bold cross
     for m in lvl.monsters:
         cells[(m.x, m.y)] = (m.type.ch, monster_class(m))
     if player_pos:
@@ -168,12 +170,19 @@ def bestiary_monsters():
         "regen": "regenerates", "undead": "undead", "pack": "packs",
         "gold": "carries gold", "humanoid": "humanoid",
         "mindless": "mindless", "fangs": "sheds teeth",
+        "incorporeal": "incorporeal (mundane blows half-miss)",
+        "needs_magic": "needs magic/enchanted weapon to harm",
+        "drain_level": "drains a level", "spineless": "spineless",
+        "acid": "corrodes armor", "spores": "confusing spores",
+        "slow": "slow", "ferocious": "ferocious",
     }
     rows = []
     for t in MONSTERS:
         tags = [notes[f] for f in
-                ("humanoid", "undead", "mindless", "poison", "regen",
-                 "erratic", "pack", "gold", "fangs") if f in t.flags]
+                ("humanoid", "undead", "incorporeal", "needs_magic",
+                 "drain_level", "spineless", "acid", "spores", "ferocious",
+                 "mindless", "poison", "regen", "erratic", "pack", "slow",
+                 "gold", "fangs") if f in t.flags]
         part = SPECIAL_PARTS.get(t.name)
         if part:
             tags.append(f"drops {part[0]}s")

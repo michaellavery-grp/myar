@@ -13,7 +13,7 @@ import random
 
 from . import SAVE_VERSION
 from .classes import CLASSES
-from .dungeon import FLOOR, BIOME_FLOORS
+from .dungeon import FLOOR, BIOME_FLOORS, _place_temple
 from .items import make_bag
 from .monsters import MONSTERS, ANIMAL_TYPES, make_animal, make_same_animal
 from .races import RACES
@@ -41,6 +41,7 @@ def _patch_monster(m):
     _ensure(m, "tamed", False)
     _ensure(m, "rooted", 0)
     _ensure(m, "stuck", 0)
+    _ensure(m, "max_hp", getattr(m, "hp", 1))
     # Relink the type to the current definition when possible so new
     # fields (genus, diet) and rebalanced flags come along.
     current = next((t for t in MONSTERS if t.name == m.type.name), None)
@@ -158,8 +159,14 @@ def migrate_game(game):
 
         _ensure(p, "memorized", [])
         _ensure(p, "book_studied", True)
+        _ensure(p, "max_level_reached", p.level)
+        _ensure(p, "blessed", 0)
+        _ensure(p, "confused", 0)
+        _ensure(p, "temp_hp", 0)
+        _ensure(p, "tithe_total", 0)
         _ensure(game, "pending_stat_points", 0)
         _ensure(game, "trade_requested", False)
+        _ensure(game, "temple_requested", False)
         _ensure(game, "pet", None)
         _ensure(game, "offer_study", False)
         _ensure(game, "pending_copy", None)
@@ -178,6 +185,7 @@ def migrate_game(game):
             _ensure(lvl, "crafting_table", None)
             _ensure(lvl, "trader_pos", None)
             _ensure(lvl, "trader_stock", [])
+            _ensure(lvl, "temple_pos", None)
             _ensure(lvl, "seen_items", set())
             for room in lvl.rooms:
                 _ensure(room, "biome", "")
@@ -192,6 +200,11 @@ def migrate_game(game):
                 _wild_regrowth(lvl)
             if old < 12:
                 _seed_fowl(lvl)  # birds came in v1.4; retrofit old levels
+            if old < 13 and lvl.temple_pos is None:
+                # Temples came in v1.5 — raise one on each cached level.
+                shrine = next(((x, y) for y, row in enumerate(lvl.grid)
+                               for x, ch in enumerate(row) if ch == "_"), None)
+                _place_temple(lvl, shrine)
 
         if old < 12 and any(
                 any(m.type.name in _FOWL for m in lvl.monsters)

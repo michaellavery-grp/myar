@@ -164,6 +164,10 @@ def make_pet_food(count=1):
     return Item("food", "pet food", count=count)
 
 
+def make_holy_water(count=1):
+    return Item("potion", "holy water", count=count)
+
+
 def _avg_dmg(spec):
     n, _, rest = spec.partition("d")
     d = int(rest.split("+")[0].split("-")[0])

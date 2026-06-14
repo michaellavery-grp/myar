@@ -52,6 +52,13 @@ HELP_TEXT = """\
   it early, or it comes at level 10. Your companion
   follows, fights, and takes the stairs at your heel.
 
+  Walk into the temple (+, bold) on each level to bless,
+  remove curses, restore drained levels or strength,
+  fill holy water, or pray. Give a tithe to raise your
+  standing: deeper devotion means kinder prayers and,
+  at the highest rank, half-price rites. Ghosts and
+  wraiths need an enchanted weapon or a spell to harm.
+
   Kill the boss every five levels. Take the Amulet of
   Yendor from Morgoth at 4950 feet, then climb back to
   the surface and ascend the stairs to win.
@@ -161,6 +168,10 @@ def draw(scr, game, colors):
                            or lvl.trader_pos in lvl.explored):
         _addstr(scr, lvl.trader_pos[1] + MAP_TOP, lvl.trader_pos[0], "$",
                 colors.pair(1, bold=True))
+    if lvl.temple_pos and (lvl.temple_pos in lvl.visible
+                           or lvl.temple_pos in lvl.explored):
+        _addstr(scr, lvl.temple_pos[1] + MAP_TOP, lvl.temple_pos[0], "+",
+                colors.pair(3, bold=True))  # a bold cross: the temple
     for m in lvl.monsters:
         if game.monster_visible(m):
             if m.tamed:
@@ -183,10 +194,19 @@ def draw(scr, game, colors):
              if "labyrinth_sense" in p.race.traits else "")
           + ("  [AMULET]" if p.has_amulet else ""))
     mana = f"  Mn:{p.mana}/{p.max_mana}" if p.max_mana else ""
-    s2 = (f"HP:{p.hp}/{p.max_hp}{mana}  AC:{p.ac}"
+    hp_str = f"HP:{p.hp}/{p.max_hp}"
+    if p.temp_hp > 0:
+        hp_str += f"(+{p.temp_hp})"
+    status = []
+    if p.blessed > 0:
+        status.append("Blessed")
+    if p.confused > 0:
+        status.append("Confused")
+    status_str = ("  " + " ".join(status)) if status else ""
+    s2 = (f"{hp_str}{mana}  AC:{p.ac}"
           f"  St:{p.stats['Str']} In:{p.stats['Int']} Wi:{p.stats['Wis']}"
           f" Dx:{p.stats['Dex']} Co:{p.stats['Con']} Ch:{p.stats['Cha']}"
-          f"  {p.hunger_state()}")
+          f"  {p.hunger_state()}{status_str}")
     _addstr(scr, STAT_ROW1, 0, s1, colors.pair(6))
     _addstr(scr, STAT_ROW2, 0, s2, colors.pair(6))
 
@@ -286,11 +306,23 @@ def show_character_sheet(scr, game, colors):
     _addstr(scr, 1, 4, f"{p.name} the {p.race.name} {p.cclass.name}",
             curses.A_BOLD)
     nxt = p.exp_to_level(p.level + 1)
-    _addstr(scr, 3, 4, f"Level {p.level}   Exp {p.exp}/{nxt}   Gold {p.gold}"
-            f"   Depth {game.depth * 50}ft   Craftsman Lv {p.craft_level}")
+    drained = (f" (drained from {p.max_level_reached})"
+               if p.level < p.max_level_reached else "")
+    _addstr(scr, 3, 4, f"Level {p.level}{drained}   Exp {p.exp}/{nxt}   "
+            f"Gold {p.gold}   Depth {game.depth * 50}ft   "
+            f"Craftsman Lv {p.craft_level}")
     mana = f"   Mana {p.mana}/{p.max_mana}" if p.max_mana else ""
-    _addstr(scr, 4, 4, f"HP {p.hp}/{p.max_hp}{mana}   AC {p.ac}"
+    temp = f" (+{p.temp_hp} temp)" if p.temp_hp else ""
+    _addstr(scr, 4, 4, f"HP {p.hp}/{p.max_hp}{temp}{mana}   AC {p.ac}"
             f"   Hunger: {p.hunger_state() or 'well fed'}")
+    ranks = ["stranger", "supplicant", "faithful", "patron"]
+    bits = [f"Tithe: {p.tithe_total} Au (rank {p.tithe_level()}, "
+            f"{ranks[p.tithe_level()]})"]
+    if p.blessed:
+        bits.append(f"Blessed {p.blessed}")
+    if p.confused:
+        bits.append(f"Confused {p.confused}")
+    _addstr(scr, 6, 4, "   ".join(bits))
     _addstr(scr, 5, 4, "   ".join(f"{s}:{p.stats[s]}" for s in STAT_NAMES))
     wield = game.item_name(p.weapon) if p.weapon else "nothing"
     worn = game.item_name(p.armor) if p.armor else "nothing"
@@ -490,6 +522,83 @@ def trade_screen(scr, game, colors):
         msgs = game.drain_msgs()
         if msgs:
             note = " ".join(msgs)
+
+
+def temple_screen(scr, game, colors):
+    p = game.player
+    note = '"Welcome, weary one. The gods watch the deep places too."'
+    ranks = ["a stranger", "a supplicant", "a faithful giver", "a patron"]
+    while True:
+        scr.erase()
+        _addstr(scr, 1, 4, f"THE HEALING TEMPLE — {game.depth * 50} feet down",
+                curses.A_BOLD)
+        tl = p.tithe_level()
+        _addstr(scr, 2, 4, f"Gold: {p.gold}    Tithe given: {p.tithe_total} "
+                f"(rank {tl} — {ranks[tl]})")
+        half = (" — HALF PRICE" if tl >= len(p.TITHE_TIERS) - 1 else "")
+        rows = [
+            ("b", f"Bless ({game.temple_price('bless')} Au)"),
+            ("r", f"Remove curse ({game.temple_price('remove curse')} Au){half}"),
+            ("l", f"Restore level ({game.temple_price('restore level')} Au)"
+                  + (f" — drained to {p.level}/{p.max_level_reached}"
+                     if p.level < p.max_level_reached else "")),
+            ("s", f"Restore strength "
+                  f"({game.temple_price('restore strength')} Au)"),
+            ("h", f"Fill holy water ({game.temple_price('holy water')} Au)"),
+            ("p", "Pray (free — the gods answer as they will)"),
+            ("g", "Give tithe (offer gold; raises your standing)"),
+        ]
+        for i, (k, label) in enumerate(rows):
+            _addstr(scr, 4 + i, 4, f"{k}) {label}")
+        _addstr(scr, 4 + len(rows) + 1, 4, "(ESC to leave the temple)")
+        _addstr(scr, 20, 4, note[:74], curses.A_DIM)
+        scr.refresh()
+        c = scr.getch()
+        if c == 27:
+            game.drain_msgs()
+            return
+        ch = chr(c) if 0 < c < 256 else ""
+        if ch == "b":
+            game.temple_bless()
+        elif ch == "r":
+            game.temple_remove_curse()
+        elif ch == "l":
+            game.temple_restore_level()
+        elif ch == "s":
+            game.temple_restore_strength()
+        elif ch == "h":
+            game.temple_fill_holy_water()
+        elif ch == "p":
+            game.temple_pray()
+            _drain_temple_stat_points(scr, game, colors)
+        elif ch == "g":
+            amt = _prompt_amount(scr, "How much gold to tithe? ")
+            if amt:
+                game.temple_give_tithe(amt)
+        msgs = game.drain_msgs()
+        if msgs:
+            note = " ".join(msgs)
+
+
+def _prompt_amount(scr, prompt):
+    _addstr(scr, 22, 4, prompt + " " * 20)
+    curses.echo()
+    curses.curs_set(1)
+    try:
+        raw = scr.getstr(22, 4 + len(prompt), 8)
+    finally:
+        curses.noecho()
+        curses.curs_set(0)
+    try:
+        return max(0, int(raw.decode("utf-8", "replace").strip() or "0"))
+    except ValueError:
+        return 0
+
+
+def _drain_temple_stat_points(scr, game, colors):
+    """Prayer can grant ability points — spend them right here."""
+    while game.pending_stat_points > 0:
+        allocate_stats_overlay(scr, game, colors)
 
 
 def _resolve_identify(scr, game, colors):
@@ -842,6 +951,9 @@ def main(stdscr):
                 if game.trade_requested:
                     game.trade_requested = False
                     trade_screen(stdscr, game, colors)
+                if game.temple_requested:
+                    game.temple_requested = False
+                    temple_screen(stdscr, game, colors)
                 if consumed:
                     game.world_tick()
                     while game.pending_stat_points > 0:

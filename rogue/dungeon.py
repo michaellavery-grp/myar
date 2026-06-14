@@ -23,6 +23,9 @@ PASSABLE = {FLOOR, PASSAGE, DOOR, STAIRS_DOWN, STAIRS_UP, CRAFT_TABLE,
 BIOME_FLOORS = {"forest": FOREST, "savannah": SAVANNAH}
 
 TRADER_EVERY = 3  # a trader sets up shop on every third level
+# The healing temple is an overlay fixture (like the trader), not a floor
+# tile — you bump into it to pray. Drawn as a bold cross.
+TEMPLE_GLYPH = "+"
 
 TRAP_KINDS = ["dart", "gas", "teleport", "trapdoor"]
 
@@ -74,6 +77,7 @@ class Level:
         self.crafting_table = None
         self.trader_pos = None
         self.trader_stock = []
+        self.temple_pos = None
 
     def tile(self, x, y):
         if 0 <= x < MAP_W and 0 <= y < MAP_H:
@@ -365,11 +369,17 @@ def _populate(lvl):
         lvl.crafting_table = spot
 
     # Sometimes, a mossy shrine of the wild (teaches the taming art)
+    shrine_pos = None
     if chance(0.25):
         spot = lvl.random_floor(avoid=lvl.stairs_up, min_dist=2)
         if spot and lvl.tile(*spot) in (FLOOR, FOREST, SAVANNAH) \
                 and spot not in lvl.traps:
             lvl.grid[spot[1]][spot[0]] = SHRINE
+            shrine_pos = spot
+
+    # A healing temple on every level — set up next to the shrine when
+    # there is one, so the holy ground is shared.
+    _place_temple(lvl, shrine_pos)
 
     # A trader every third level — a fixture, not a monster; can't be fought
     if depth % TRADER_EVERY == 0:
@@ -394,3 +404,27 @@ def _near(lvl, pos):
                 and not lvl.monster_at(nx, ny)):
             return nx, ny
     return None
+
+
+def _temple_ok(lvl, pos):
+    if pos is None:
+        return False
+    if lvl.tile(*pos) not in (FLOOR, FOREST, SAVANNAH):
+        return False
+    return (pos not in lvl.traps and pos != lvl.trader_pos
+            and pos not in (lvl.stairs_up, lvl.stairs_down)
+            and not lvl.monster_at(*pos))
+
+
+def _place_temple(lvl, shrine_pos):
+    """Site the temple beside the shrine if possible, else anywhere open."""
+    if shrine_pos is not None:
+        spot = _near(lvl, shrine_pos)
+        if _temple_ok(lvl, spot):
+            lvl.temple_pos = spot
+            return
+    for _ in range(40):
+        spot = lvl.random_floor(avoid=lvl.stairs_up, min_dist=3)
+        if _temple_ok(lvl, spot):
+            lvl.temple_pos = spot
+            return

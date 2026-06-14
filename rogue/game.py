@@ -8,7 +8,8 @@ from .dungeon import (gen_level, FLOOR, DOOR, PASSAGE, STAIRS_DOWN, STAIRS_UP,
 from .items import (POTION_SUBTYPES, SCROLL_SUBTYPES, POTION_COLORS,
                     random_scroll_title, make_amulet, make_gold,
                     make_material, make_weapon, make_armor, rand_item,
-                    item_value, MATERIALS, RECIPES, WEAPON_DEFS, RANGED)
+                    item_value, MATERIALS, RECIPES, WEAPON_DEFS, RANGED,
+                    make_holy_water)
 from .items import Item
 from .monsters import (Monster, choose_type, SPECIAL_PARTS, make_animal,
                        make_same_animal)
@@ -44,6 +45,7 @@ class Game:
         self.pending_identify = False
         self.pending_stat_points = 0
         self.trade_requested = False
+        self.temple_requested = False
         self.pet = None
         self.offer_study = False
         self.pending_copy = None   # materials owed once a scroll is chosen
@@ -71,6 +73,8 @@ class Game:
         self.identified.add((item.kind, item.subtype))
 
     def is_identified(self, item):
+        if item.kind == "potion" and item.subtype == "holy water":
+            return True  # sacred water is never a mystery
         return (item.kind not in ("potion", "scroll")
                 or (item.kind, item.subtype) in self.identified)
 
@@ -196,9 +200,13 @@ class Game:
                 nx, ny = p.x + dx, p.y + dy
                 if ((dx, dy) != (0, 0) and self.level.passable(nx, ny)
                         and not self.level.monster_at(nx, ny)
-                        and (nx, ny) != self.level.trader_pos):
+                        and not self._is_fixture(nx, ny)):
                     return nx, ny
         return self.level.random_floor(avoid=(p.x, p.y), min_dist=2)
+
+    def _is_fixture(self, x, y):
+        """A tile occupied by an un-walkable fixture (trader or temple)."""
+        return (x, y) in (self.level.trader_pos, self.level.temple_pos)
 
     def _displace(self, m):
         """Shove a monster off the player's tile (never delete it)."""
@@ -282,9 +290,17 @@ class Game:
 
     def move_player(self, dx, dy):
         p = self.player
+        if p.confused > 0:
+            # Staggering — the chosen direction goes awry
+            p.confused -= 1
+            dx, dy = random.choice([(a, b) for a in (-1, 0, 1)
+                                    for b in (-1, 0, 1) if (a, b) != (0, 0)])
         nx, ny = p.x + dx, p.y + dy
         if (nx, ny) == self.level.trader_pos:
             self.trade_requested = True
+            return False
+        if (nx, ny) == self.level.temple_pos:
+            self.temple_requested = True
             return False
         mon = self.level.monster_at(nx, ny)
         if mon:
@@ -403,6 +419,18 @@ class Game:
         p.remove_one(item)
         first_time = not self.is_identified(item)
         self.identify(item)
+        if sub == "holy water":
+            p.hp = min(p.max_hp, p.hp + roll("2d8") + 8)
+            p.confused = 0
+            p.blessed += 25
+            for it in (p.weapon, p.armor):
+                if it is not None:
+                    it.hit_ench = max(0, it.hit_ench)
+                    it.dmg_ench = max(0, it.dmg_ench)
+                    it.ac_ench = max(0, it.ac_ench)
+            self.msg("The holy water blazes cool and clean — wounds close, "
+                     "curses lift, and a blessing settles upon you.")
+            return True
         if sub == "healing":
             p.hp = min(p.max_hp, p.hp + roll("1d8") + 8)
             self.msg("You begin to feel better.")
@@ -550,6 +578,14 @@ class Game:
             return False
         m.asleep = False
         bow = p.weapon
+        magical = bow.hit_ench > 0 or bow.dmg_ench > 0
+        if "needs_magic" in m.type.flags and not magical:
+            self.msg(f"Your arrow passes through the {m.name} without "
+                     "effect — it needs enchanted shafts or magic.")
+            return True
+        if ("incorporeal" in m.type.flags and not magical and chance(0.5)):
+            self.msg(f"Your arrow sails through the {m.name}.")
+            return True
         attack_roll = random.randint(1, 20) + p.ranged_to_hit()
         if attack_roll < m.type.ac:
             self.msg(f"Your arrow whistles past the {m.name}.")
@@ -578,8 +614,8 @@ class Game:
         for _ in range(5):
             x += dx
             y += dy
-            if (x, y) == self.level.trader_pos:
-                break  # no trampling the trader
+            if self._is_fixture(x, y):
+                break  # no trampling the trader or temple
             target = self.level.monster_at(x, y)
             if target:
                 break
@@ -947,6 +983,149 @@ class Game:
         p.gold += price
         self.msg(f"The trader pays you {price} gold.")
 
+    # -- the healing temple --------------------------------------------------
+
+    TEMPLE_BASE_PRICES = {
+        "bless": 100, "remove curse": 150, "restore level": 300,
+        "restore strength": 120, "holy water": 200,
+    }
+    # At the highest tithe tier, these four services are half price.
+    TEMPLE_HALF_AT_MAX = {"bless", "remove curse", "restore level",
+                          "restore strength"}
+
+    def temple_price(self, service):
+        base = self.TEMPLE_BASE_PRICES.get(service, 0)
+        if (self.player.tithe_level() >= len(self.player.TITHE_TIERS) - 1
+                and service in self.TEMPLE_HALF_AT_MAX):
+            base //= 2
+        return base
+
+    def temple_bless(self):
+        p = self.player
+        price = self.temple_price("bless")
+        if p.gold < price:
+            self.msg("The acolyte shakes his head; you cannot pay the offering.")
+            return
+        p.gold -= price
+        p.blessed += 30 + 20 * p.tithe_level()  # tithe deepens the favor
+        self.msg("A serene light settles over you. You feel blessed "
+                 f"(+1 to-hit, +1 AC) for {p.blessed} turns.")
+
+    def temple_remove_curse(self):
+        p = self.player
+        price = self.temple_price("remove curse")
+        if p.gold < price:
+            self.msg("You cannot pay for the rite of cleansing.")
+            return
+        cursed = [it for it in (p.weapon, p.armor) if it is not None and
+                  (it.hit_ench < 0 or it.dmg_ench < 0 or it.ac_ench < 0)]
+        if not cursed:
+            self.msg("The priest senses no curse upon you. Your gold stays.")
+            return
+        p.gold -= price
+        for it in cursed:
+            it.hit_ench = max(0, it.hit_ench)
+            it.dmg_ench = max(0, it.dmg_ench)
+            it.ac_ench = max(0, it.ac_ench)
+        self.msg("Black vapors hiss away — the curse is lifted.")
+
+    def temple_restore_level(self):
+        p = self.player
+        price = self.temple_price("restore level")
+        if p.level >= p.max_level_reached:
+            self.msg("Your spirit is whole; there is nothing to restore.")
+            return
+        if p.gold < price:
+            self.msg("You cannot pay for the rite of restoration.")
+            return
+        p.gold -= price
+        while p.level < p.max_level_reached:
+            p.level += 1
+            p.max_hp += max(1, p.cclass.hit_die // 2 + max(0, p.mod("Con")))
+        p.exp = max(p.exp, p.exp_to_level(p.level))
+        p.refresh_mana_cap()
+        self.msg(f"Life floods back into you — restored to level {p.level}!")
+
+    def temple_restore_strength(self):
+        p = self.player
+        price = self.temple_price("restore strength")
+        if p.stats["Str"] >= p.max_str:
+            self.msg("Your strength is already at its peak.")
+            return
+        if p.gold < price:
+            self.msg("You cannot pay for the rite.")
+            return
+        p.gold -= price
+        p.stats["Str"] = p.max_str
+        self.msg("Vigor returns to your limbs; your strength is restored.")
+
+    def temple_fill_holy_water(self):
+        p = self.player
+        price = self.temple_price("holy water")
+        if p.gold < price:
+            self.msg("The font is not free, pilgrim.")
+            return
+        if not p.add_item(make_holy_water()):
+            self.msg("You have nothing to hold the holy water.")
+            return
+        p.gold -= price
+        self.msg("You fill a vial at the sacred font. (a potion of holy water)")
+
+    def temple_give_tithe(self, amount):
+        p = self.player
+        amount = min(amount, p.gold)
+        if amount <= 0:
+            self.msg("You have no gold to give.")
+            return
+        before = p.tithe_level()
+        p.gold -= amount
+        p.tithe_total += amount
+        self.msg(f"You lay {amount} gold upon the altar.")
+        if p.tithe_level() > before:
+            self.msg(f"The gods take note — you are now a tithe-patron of "
+                     f"rank {p.tithe_level()}. Blessings and prayers will "
+                     "favor you more.")
+
+    def temple_pray(self):
+        """A gamble: the higher your tithe, the kinder the answer."""
+        p = self.player
+        tl = p.tithe_level()
+        roll_d = random.random() + 0.08 * tl  # devotion tips the scales
+        if roll_d < 0.20:
+            self.msg("The silence is absolute. Your prayer goes unanswered.")
+            return
+        if roll_d < 0.40:
+            heal = roll("2d8") + p.level
+            p.hp = min(p.max_hp, p.hp + heal)
+            p.confused = 0
+            self.msg("A gentle warmth mends your wounds and clears your head.")
+            return
+        if roll_d < 0.62:
+            p.temp_hp = max(p.temp_hp, 5 + 2 * p.level + 3 * tl)
+            self.msg(f"A shield of faith surrounds you — {p.temp_hp} "
+                     "temporary hit points.")
+            return
+        if roll_d < 0.82:
+            gain = 5 + p.level
+            p.max_hp += gain
+            p.hp += gain
+            self.msg(f"You feel hardier — your maximum hit points rise by "
+                     f"{gain}!")
+            return
+        if roll_d < 0.96:
+            self.pending_stat_points += 1
+            self.msg("The gods grant you a measure of their strength! "
+                     "(an ability point to spend)")
+            return
+        # The rarest grace
+        p.blessed += 60
+        gain = 8 + p.level
+        p.max_hp += gain
+        p.hp += gain
+        self.pending_stat_points += 1
+        self.msg("A pillar of radiance engulfs you — you are profoundly "
+                 "favored! (HP, an ability point, and a long blessing)")
+
     # -- magic ---------------------------------------------------------------
 
     def cast(self, spell):
@@ -1152,6 +1331,20 @@ class Game:
 
     def attack(self, mon, charging=False):
         p = self.player
+        magical = p.weapon_is_magical()
+        # Wraiths and the like shrug off mundane steel entirely.
+        if "needs_magic" in mon.type.flags and not magical:
+            self.msg(f"Your weapon passes through the {mon.name} "
+                     "without effect — only enchanted arms or magic can "
+                     "harm it!")
+            mon.asleep = False
+            return
+        # A ghost is half-real; mundane blows often pass clean through.
+        if ("incorporeal" in mon.type.flags and not magical
+                and chance(0.5)):
+            self.msg(f"Your blow passes harmlessly through the {mon.name}.")
+            mon.asleep = False
+            return
         was_oblivious = mon.asleep or mon.confused > 0
         mon.asleep = False
         attack_roll = random.randint(1, 20) + p.to_hit_bonus()
@@ -1258,6 +1451,7 @@ class Game:
         p = self.player
         while p.exp >= p.exp_to_level(p.level + 1):
             p.level += 1
+            p.max_level_reached = max(p.max_level_reached, p.level)
             gain = random.randint(1, p.cclass.hit_die) + max(0, p.mod("Con"))
             gain = max(1, gain)
             p.max_hp += gain
@@ -1290,24 +1484,72 @@ class Game:
         self.pending_stat_points -= 1
         self.msg(f"You feel your {name} increase ({p.stats[name]}).")
 
+    def _damage_player(self, dmg):
+        """Apply damage, spending transient (prayer) hit points first."""
+        p = self.player
+        if p.temp_hp > 0:
+            absorbed = min(p.temp_hp, dmg)
+            p.temp_hp -= absorbed
+            dmg -= absorbed
+        p.hp -= dmg
+
     def monster_attack(self, mon):
         p = self.player
+        flags = mon.type.flags
         attack_roll = random.randint(1, 20) + mon.level
         if attack_roll < p.ac:
             self.msg(f"The {mon.name} misses you.")
             return
         dmg = max(1, roll(mon.type.dmg))
-        p.hp -= dmg
+        if "ferocious" in flags:
+            dmg += roll("1d6")
+        self._damage_player(dmg)
         self.msg(f"The {mon.name} hits you.")
-        if "poison" in mon.type.flags and "poison_immune" not in p.race.traits:
+        if "poison" in flags and "poison_immune" not in p.race.traits:
             save = random.randint(1, 20) + p.mod("Con")
             if "magic_resist" in p.race.traits:
                 save += 3
             if save < 12:
                 p.stats["Str"] = max(3, p.stats["Str"] - 1)
                 self.msg("You feel a sting... and weaker.")
+        if "acid" in flags and p.armor is not None and p.hp > 0:
+            save = random.randint(1, 20) + p.mod("Dex")
+            if "levitate" in p.race.traits or save >= 14:
+                pass  # nimble enough to keep the acid off your gear
+            else:
+                p.armor.ac_ench -= 1
+                self.msg(f"The {mon.name}'s touch corrodes your "
+                         f"{p.armor.subtype}!")
+        if ("spores" in flags and p.hp > 0
+                and "magic_resist" not in p.race.traits):
+            save = random.randint(1, 20) + p.mod("Con")
+            if save < 13:
+                p.confused += roll("1d6") + 3
+                self.msg("Choking spores burst around you — the world reels!")
+        if "drain_level" in flags and p.hp > 0:
+            self._drain_level(mon)
         if p.hp <= 0:
             raise GameOver(f"killed by {self._kill_name(mon)}")
+
+    def _drain_level(self, mon):
+        """A spectre's chill steals a hard-won level (restore at a temple)."""
+        p = self.player
+        if "magic_resist" in p.race.traits and chance(0.5):
+            self.msg("The draining chill washes over you, but your blood "
+                     "holds its warmth.")
+            return
+        if p.level <= 1:
+            p.exp = 0
+            self.msg(f"The {mon.name} drains at your very essence!")
+            return
+        p.level -= 1
+        loss = max(1, p.cclass.hit_die // 2 + max(0, p.mod("Con")))
+        p.max_hp = max(1, p.max_hp - loss)
+        p.hp = min(p.hp, p.max_hp)
+        p.exp = p.exp_to_level(p.level)
+        p.refresh_mana_cap()
+        self.msg(f"The {mon.name}'s touch drains your life — "
+                 f"you sink to level {p.level}! (restore it at a temple)")
 
     def _kill_name(self, mon):
         return mon.name if mon.is_boss else f"a {mon.name}"
@@ -1366,6 +1608,12 @@ class Game:
             skip_monsters = self.haste_parity
         if p.invis > 0:
             p.invis -= 1
+        if p.blessed > 0:
+            p.blessed -= 1
+            if p.blessed == 0:
+                self.msg("The warmth of the blessing fades.")
+        if p.temp_hp > 0 and self.turn % 8 == 0:
+            p.temp_hp -= 1  # transient vigor bleeds away slowly
         if self.detect_turns > 0:
             self.detect_turns -= 1
 
@@ -1454,6 +1702,9 @@ class Game:
                 m.hp += 1
             if m.tamed:
                 self._pet_act(m)
+                continue
+            # Sluggish things (cubes, fungi) act only every other turn
+            if "slow" in m.type.flags and self.turn % 2 == 0:
                 continue
             if m.asleep:
                 self._maybe_wake(m)
@@ -1569,7 +1820,7 @@ class Game:
     def _try_move(self, m, nx, ny):
         if not self.level.passable(nx, ny):
             return False
-        if (nx, ny) == self.level.trader_pos:
+        if self._is_fixture(nx, ny):
             return False
         if self.level.monster_at(nx, ny):
             return False

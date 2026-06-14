@@ -56,15 +56,15 @@ Requires Python 3.9+ and a terminal of at least **80×24**.
 |:------:|---------|:------:|---------|
 | `@` | you | `letters` | monsters (color = attitude) |
 | `.` | floor | `#` | corridor |
-| `-` `\|` | walls | `+` | door |
+| `-` `\|` | walls | `+` | door (dim) / temple (bold) |
 | `>` `<` | stairs down / up | `^` | revealed trap |
 | `"` | forest grass | `'` | savannah scrub |
 | `=` | crafting table | `_` | shrine of the wild |
-| `$` | trader | `*` | gold |
+| `$` | trader | `+` | healing temple (bold) |
 | `!` | potion | `?` | scroll |
 | `)` | weapon | `]` | armor |
 | `%` | food | `~` | crafting material |
-| `,` | the Amulet of Yendor | | |
+| `*` | gold | `,` | the Amulet of Yendor |
 
 Monster colors: **white** hostile, **yellow** wary, **green** friendly,
 **bright green** your companion, **red** boss.
@@ -215,6 +215,8 @@ Wizards and Illusionists can turn the dungeon's fauna into a library:
   where tameable animals live and wander in over time.
 - **Shrines of the wild** (`_`) appear on roughly a quarter of levels —
   step on one to learn taming early.
+- **Healing temples** (`+`, a bold cross) — one per level, set beside the
+  shrine when there is one. Walk in to use their services (below).
 - **Crafting tables** (`=`) — one per level, always.
 - **Traders** (`$`) — every **3rd level**. Walk into them to buy and
   sell (TAB switches modes). They cannot be attacked, monsters leave
@@ -273,14 +275,22 @@ gold, gear, an ear *and* teeth from a single kill. Fanged animals
 | `s` | snake | 2–11 | poison, fangs; drops venom glands |
 | `g` | goblin | 2–12 | humanoid, fangs |
 | `S` | skeleton | 2–20 | undead; drops bones |
+| `F` | myconoid | 3–22 | mushroom-folk; spores confuse, slow, spineless |
 | `o` | orc | 3–16 | humanoid, carries gold, fangs; drops orc ears |
+| `J` | ooze | 4–25 | spineless; **acid** corrodes your armor |
 | `z` | zombie | 4–16 | undead, mindless |
+| `N` | gnoll | 4–18 | humanoid, fangs, packs |
 | `H` | hobgoblin | 5–18 | humanoid, fangs |
 | `c` | giant centipede | 5–18 | poison; drops gall glands (ink!) |
+| `U` | bugbear | 6–24 | big goblinoid, humanoid |
+| `G` | ghost | 6–30 | undead, **incorporeal** — half of mundane blows pass through |
+| `Q` | gelatinous cube | 8–40 | spineless, slow; **acid**, tough |
 | `W` | wight | 7–22 | undead |
+| `Y` | owlbear | 8–30 | beast, **ferocious**, fangs; drops feathers |
 | `O` | ogre | 8–26 | humanoid, carries gold, fangs |
 | `T` | cave troll | 10–34 | humanoid, regenerates, fangs |
-| `w` | wraith | 12–40 | undead |
+| `w` | wraith | 12–40 | undead; **needs a magical weapon or spell to harm** |
+| `Z` | spectre | 18–55 | undead, incorporeal; **drains a level** on touch |
 | `V` | vampire | 14–48 | undead, regenerates, fangs |
 | `P` | stone giant | 15–55 | humanoid, carries gold |
 | `L` | lich | 22–70 | undead |
@@ -317,6 +327,33 @@ gold, gear, an ear *and* teeth from a single kill. Fanged animals
 
 All bosses guard the down staircase, carry rich hoards, and regenerate.
 Morgoth holds the Amulet of Yendor.
+
+> **Incorporeal & magic-proof undead.** A **ghost** lets half of all
+> mundane blows pass through it; a **wraith** ignores non-magical weapons
+> entirely; a **spectre** does both *and* drains a character level on
+> touch. To harm them, wield an **enchanted weapon** (any `+` to-hit or
+> damage — including an enchanted bow), or hit them with a **spell**.
+> Restore drained levels at a temple.
+
+## Temples & Tithing
+
+A **healing temple** (`+`) sits on every level. Walk into it for:
+
+| Service | Effect |
+|---------|--------|
+| **Bless** | A blessing: +1 to-hit and +1 AC for a while (longer the more you've tithed). |
+| **Remove curse** | Lifts negative enchantments from your wielded/worn gear. |
+| **Restore level** | Undoes spectre level-drain, back up to your peak. |
+| **Restore strength** | Returns Strength sapped by poison to its maximum. |
+| **Fill holy water** | A potion of **holy water** — quaff to heal, lift curses, and bless. |
+| **Pray** | Free, but a gamble: may heal, grant temporary HP, raise max HP, give an ability point, or (rarely) all at once. |
+| **Give tithe** | Offer gold to raise your standing with the gods. |
+
+**Tithing** is tracked across your whole game. Crossing **250 / 1,000 /
+5,000** total gold given raises you through ranks 1–3 (supplicant →
+faithful → patron). Higher rank means **stronger blessings** and **kinder
+prayers**. At the **highest rank**, Bless, Remove Curse, Restore Level
+and Restore Strength are **half price**.
 
 ## Taming & Companions
 
