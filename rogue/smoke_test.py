@@ -727,6 +727,140 @@ def test_scrollcraft():
     print("ok  scrollcraft: vellum/quill/ink, spellbook, copy, etch, cast")
 
 
+def test_scribing_and_dweomery():
+    """The full scribe's craft and the spellcraft (dweomery) it feeds.
+
+    Guards the menu-availability bug: 'etch a scroll into spellbook' must
+    NOT be offered until a blank spellbook has actually been crafted and
+    is on the character. Also exercises every prerequisite gate and the
+    downstream memorize-and-cast flow.
+    """
+    from .items import make_material, RECIPES, Item
+
+    def ridx(result):
+        return next(i for i, r in enumerate(RECIPES) if r[2] == result)
+
+    def menu(g):
+        """Exactly what the crafting table would display right now."""
+        return set(g.craftable_now())
+
+    SPELLBOOK, COPY, ETCH = (ridx("spellbook"), ridx("copy_scroll"),
+                             ridx("etch_scroll"))
+    VELLUM, QUILL, INK = (ridx("material:vellum"), ridx("material:quill"),
+                          ridx("material:ink"))
+
+    # --- non-arcane casters never see scribe recipes ---------------------
+    fg = Game("Grunt", _race("Human"), _cclass("Fighter"))
+    fg.level.grid[fg.player.y][fg.player.x] = "="
+    for it in (make_material("vellum", 9), make_material("ink", 9),
+               make_material("quill", 9), make_material("hide", 9)):
+        fg.player.add_item(it)
+    s = Item("scroll", "light")
+    fg.player.add_item(s)
+    fg.identify(s)
+    m = menu(fg)
+    assert SPELLBOOK not in m and COPY not in m and ETCH not in m, \
+        "fighter was offered scribe recipes"
+    assert not fg.recipe_available(RECIPES[ETCH])
+
+    # --- arcane caster, full materials, NO spellbook ---------------------
+    g = Game("Scribe", _race("Fairy"), _cclass("Wizard"))
+    p = g.player
+    g.level.grid[p.y][p.x] = "="
+    for it in (make_material("vellum", 9), make_material("ink", 9),
+               make_material("quill", 9), make_material("hide", 9)):
+        p.add_item(it)
+    m = menu(g)
+    # THE BUG: etch must not appear without a spellbook, even with mats
+    assert ETCH not in m, "etch offered with no spellbook (the reported bug)"
+    assert SPELLBOOK in m, "spellbook recipe should be available"
+    # copy needs an identified scroll — none yet
+    assert COPY not in m, "copy offered with no identified scroll"
+    assert not g.do_craft(ETCH), "etch should hard-fail without a book"
+    assert p.spellbook() is None, "failed etch must not conjure a book"
+
+    # Give an identified scroll → copy becomes available, etch still not
+    scroll = Item("scroll", "magic mapping")
+    p.add_item(scroll)
+    g.identify(scroll)
+    m = menu(g)
+    assert COPY in m and ETCH not in m
+
+    # --- craft the spellbook -------------------------------------------
+    assert g.do_craft(SPELLBOOK)
+    book = p.spellbook()
+    assert book is not None
+    m = menu(g)
+    assert SPELLBOOK not in m, "second spellbook should not be offered"
+    assert ETCH in m, "etch must be available once the book exists"
+
+    # --- etch fills the book; offer withdraws when full -----------------
+    # (etch is a two-step craft: do_craft(ETCH) arms it, then a chosen
+    #  scroll is consumed — exactly as the UI drives it.)
+    subs = ["magic mapping", "teleportation", "light", "identify",
+            "enchant weapon", "enchant armor"]
+    for sub in subs:
+        if not any(it.kind == "scroll" and it.subtype == sub
+                   for it in p.inventory):
+            sc = Item("scroll", sub)
+            p.add_item(sc)
+            g.identify(sc)
+        if g.material_count("ink") < 1:
+            p.add_item(make_material("ink", 1))
+        if g.material_count("quill") < 1:
+            p.add_item(make_material("quill", 1))
+        assert ETCH in menu(g), f"etch should be available for {sub}"
+        assert not g.do_craft(ETCH)          # arms pending_etch
+        assert g.pending_etch is not None
+        target = next(it for it in p.inventory
+                      if it.kind == "scroll" and it.subtype == sub)
+        assert g.etch_scroll(target), sub
+        assert sub in book.contents
+    assert len(book.contents) == 6
+    # Full book: etch no longer offered even with scrolls + materials
+    extra = Item("scroll", "light")
+    p.add_item(extra)
+    g.identify(extra)
+    p.add_item(make_material("ink", 2))
+    p.add_item(make_material("quill", 2))
+    assert ETCH not in menu(g), "etch offered on a full (6/6) spellbook"
+
+    # An identified scroll already etched doesn't re-enable etch on its own
+    only_dupes = Game("Dupe", _race("Fairy"), _cclass("Wizard"))
+    p2 = only_dupes.player
+    only_dupes.level.grid[p2.y][p2.x] = "="
+    for it in (make_material("vellum", 9), make_material("hide", 2),
+               make_material("ink", 5), make_material("quill", 5)):
+        p2.add_item(it)
+    assert only_dupes.do_craft(ridx("spellbook"))
+    d = Item("scroll", "light")
+    p2.add_item(d)
+    only_dupes.identify(d)
+    assert not only_dupes.do_craft(ridx("etch_scroll"))  # arm it
+    assert only_dupes.etch_scroll(d)            # light now in book
+    dupe = Item("scroll", "light")              # another light scroll
+    p2.add_item(dupe)
+    only_dupes.identify(dupe)
+    assert ridx("etch_scroll") not in menu(only_dupes), \
+        "etch offered when the only scroll is already in the book"
+
+    # --- dweomery: memorize from the book and cast -----------------------
+    p.memorized = ["magic mapping"]
+    p.book_studied = True
+    spell = next(s for s in p.known_spells()
+                 if s.key == "scroll:magic mapping")
+    p.mana = max(p.mana, spell.mana)
+    explored0 = len(g.level.explored)
+    assert g.cast(spell)
+    assert len(g.level.explored) > explored0, "book-cast mapping did nothing"
+    # Only up to 3 may be memorized; known_spells reflects the loadout
+    p.memorized = ["light", "identify", "teleportation"]
+    book_spells = [s for s in p.known_spells() if s.key.startswith("scroll:")]
+    assert len(book_spells) == 3
+    print("ok  scribing & dweomery: etch gated on a real spellbook, "
+          "full craft + cast chain")
+
+
 def test_fowl():
     import rogue.game as game_mod
     from .monsters import ANIMAL_TYPES, SPECIAL_PARTS, Monster as M
@@ -1110,6 +1244,7 @@ if __name__ == "__main__":
     test_crafting_bag()
     test_pet_food_scraps()
     test_scrollcraft()
+    test_scribing_and_dweomery()
     test_fowl()
     test_fowl_flocking_and_retrofit()
     test_new_monsters()

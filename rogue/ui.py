@@ -443,10 +443,7 @@ def craft_screen(scr, game, colors):
         for k, extra in enumerate(mat_lines[1:]):
             _addstr(scr, 4 + k, 16, extra)
         top = 4 + len(mat_lines)
-        makeable = [(i, r) for i, r in enumerate(RECIPES)
-                    if game.can_craft(r)
-                    and not (r[2] in ("copy_scroll", "etch_scroll", "spellbook")
-                             and not game.player.is_arcane())]
+        makeable = [(i, RECIPES[i]) for i in game.craftable_now()]
         if not makeable:
             _addstr(scr, top, 4, "You lack the materials to make anything "
                     "here. Go hunting.", curses.A_DIM)

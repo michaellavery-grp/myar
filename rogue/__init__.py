@@ -1,6 +1,6 @@
 """M.Y.A.R. — Mike's Yet Another Rogue. A classic Rogue/Moria-style CLI roguelike."""
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 SAVE_VERSION = 13
 
 MAP_W = 80

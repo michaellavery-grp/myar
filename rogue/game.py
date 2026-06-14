@@ -737,6 +737,41 @@ class Game:
         _, needs, _ = recipe
         return all(self.material_count(k) >= n for k, n in needs.items())
 
+    def _identified_scrolls(self):
+        return [it for it in self.player.inventory
+                if it.kind == "scroll" and self.is_identified(it)]
+
+    def recipe_available(self, recipe):
+        """Prerequisites beyond raw materials — what the craft menu should
+        actually offer. Materials are checked separately by can_craft.
+
+        Scribe recipes are arcane-only and have object prerequisites: you
+        cannot etch without a spellbook, cannot bind a second spellbook,
+        and cannot copy/etch without an identified scroll to work from.
+        """
+        _, _, result = recipe
+        p = self.player
+        if result in ("copy_scroll", "etch_scroll", "spellbook"):
+            if not p.is_arcane():
+                return False
+        if result == "spellbook":
+            return p.spellbook() is None           # one grimoire only
+        if result == "copy_scroll":
+            return bool(self._identified_scrolls())
+        if result == "etch_scroll":
+            book = p.spellbook()
+            if book is None or len(book.contents) >= 6:
+                return False
+            # need an identified scroll not already etched into the book
+            return any(it.subtype not in book.contents
+                       for it in self._identified_scrolls())
+        return True
+
+    def craftable_now(self):
+        """The recipe indices the table should currently display."""
+        return [i for i, r in enumerate(RECIPES)
+                if self.can_craft(r) and self.recipe_available(r)]
+
     def _consume_materials(self, needs):
         p = self.player
         for key, n in needs.items():
