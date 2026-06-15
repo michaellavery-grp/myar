@@ -171,9 +171,12 @@ and press `C` — the menu shows **only what you can make right now**.
   [4] (a leather armor + 4 teeth) → **bone armor** [5] → … →
   **drake-scale [8]** → **dragon-scale [9]**, the finest armor in the
   game. Scale and bone tiers are **craft-only** — never loot.
-- **Bows & arrows:** short and long bows; **fine arrows** (+1 bow damage,
-  permanent); **poison arrows** (brew a vial of poison from snake venom,
-  then envenom a bow for 8 shots, +1d6 each — the undead don't care).
+- **Bows & arrows:** **short bow** (range 5) and **long bow** (range 7),
+  fired with `f` at the nearest foe in range and line of sight — no
+  shooting through walls; **fine arrows** (+1 bow damage, permanent);
+  **poison arrows** (brew a vial of poison from snake venom, then envenom
+  a bow for 8 shots, +1d6 each — the undead don't care). **Skeletons**
+  take only half damage from arrows — bone lets them through.
 - **Provisions:** savage brew (a strength potion), kobold-tail soup
   (a full ration), and **pet food** — **any two small parts** (bat eye,
   rat tail, bone, orc ear, kobold tail, in any combination) make one
@@ -187,10 +190,10 @@ and press `C` — the menu shows **only what you can make right now**.
 
 Wizards and Illusionists can turn the dungeon's fauna into a library:
 
-1. **Vellum** — 2 hides → 1 sheet.
+1. **Vellum** — **1 hide → 2 sheets**, or **1 skin → 1 sheet**.
 2. **Quills** — 2 feathers → 1 quill. Fowl (hens, roosters, ducks, geese,
    cockatrices, the phoenix) shed feathers when slain.
-3. **Ink** — 2 gall glands → 1 vial. Giant centipedes carry the glands.
+3. **Ink** — **1 gall gland → 2 vials**. Giant centipedes carry the glands.
 4. **Copy a scroll** — 1 vellum + 1 ink + 1 quill duplicates any
    *identified* scroll you carry; copies stack normally. Quills are
    spent with every scribing job.
@@ -274,7 +277,7 @@ gold, gear, an ear *and* teeth from a single kill. Fanged animals
 | `j` | jackal | 1–6 | hunts in packs, fangs |
 | `s` | snake | 2–11 | poison, fangs; drops venom glands |
 | `g` | goblin | 2–12 | humanoid, fangs |
-| `S` | skeleton | 2–20 | undead; drops bones |
+| `S` | skeleton | 2–20 | undead; drops bones; **half damage from arrows** |
 | `F` | myconoid | 3–22 | mushroom-folk; spores confuse, slow, spineless |
 | `o` | orc | 3–16 | humanoid, carries gold, fangs; drops orc ears |
 | `J` | ooze | 4–25 | spineless; **acid** corrodes your armor |
@@ -346,7 +349,7 @@ A **healing temple** (`+`) sits on every level. Walk into it for:
 | **Restore level** | Undoes spectre level-drain, back up to your peak. |
 | **Restore strength** | Returns Strength sapped by poison to its maximum. |
 | **Fill holy water** | A potion of **holy water** — quaff to heal, lift curses, and bless. |
-| **Pray** | Free, but a gamble: may heal, grant temporary HP, raise max HP, give an ability point, or (rarely) all at once. |
+| **Pray** | Free, but a gamble and **once per temple**: may heal, grant temporary HP, raise max HP, give an ability point, or (rarely) all at once. |
 | **Give tithe** | Offer gold to raise your standing with the gods. |
 
 **Tithing** is tracked across your whole game. Crossing **250 / 1,000 /
@@ -393,7 +396,10 @@ and Restore Strength are **half price**.
 - **Potions and scrolls are unidentified** each game ("a murky potion",
   "a scroll titled 'ZELGOR NYM ASH'") until drunk, read, identified by
   scroll, or appraised (Archeologist). Brews you craft yourself are
-  always identified.
+  always identified. **Arcane casters** (Wizards, Illusionists) often
+  recognize a scroll's incantation the moment they pick it up — the
+  chance rises with Intelligence. **Any class can read scrolls** — yes,
+  thieves too.
 - Weapons carry to-hit/damage enchantments (`a +1,+2 long sword`),
   armor an AC bonus; both can be raised by enchant scrolls, masterwork
   or magical crafting.

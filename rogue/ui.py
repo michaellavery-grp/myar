@@ -532,9 +532,22 @@ def temple_screen(scr, game, colors):
         tl = p.tithe_level()
         _addstr(scr, 2, 4, f"Gold: {p.gold}    Tithe given: {p.tithe_total} "
                 f"(rank {tl} — {ranks[tl]})")
+        # Afflictions the temple can mend — surfaced up front.
+        ail = []
+        if p.level < p.max_level_reached:
+            ail.append(f"level drained to {p.level}/{p.max_level_reached}")
+        if p.stats["Str"] < p.max_str:
+            ail.append(f"Str sapped to {p.stats['Str']}/{p.max_str}")
+        if any((it.hit_ench < 0 or it.dmg_ench < 0 or it.ac_ench < 0)
+               for it in (p.weapon, p.armor) if it is not None):
+            ail.append("cursed gear")
+        _addstr(scr, 3, 4, ("Afflictions: " + "; ".join(ail)) if ail
+                else "Afflictions: none — you are hale.",
+                curses.A_BOLD if ail else curses.A_DIM)
         half = (" — HALF PRICE" if tl >= len(p.TITHE_TIERS) - 1 else "")
+        prayed = game.temple_already_prayed()
         rows = [
-            ("b", f"Bless ({game.temple_price('bless')} Au)"),
+            ("b", f"Bless ({game.temple_price('bless')} Au){half}"),
             ("r", f"Remove curse ({game.temple_price('remove curse')} Au){half}"),
             ("l", f"Restore level ({game.temple_price('restore level')} Au)"
                   + (f" — drained to {p.level}/{p.max_level_reached}"
@@ -542,7 +555,9 @@ def temple_screen(scr, game, colors):
             ("s", f"Restore strength "
                   f"({game.temple_price('restore strength')} Au)"),
             ("h", f"Fill holy water ({game.temple_price('holy water')} Au)"),
-            ("p", "Pray (free — the gods answer as they will)"),
+            ("p", "Pray (already answered here)" if prayed
+                  else "Pray (free — once per temple; the gods answer as "
+                       "they will)"),
             ("g", "Give tithe (offer gold; raises your standing)"),
         ]
         for i, (k, label) in enumerate(rows):

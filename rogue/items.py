@@ -44,9 +44,10 @@ RECIPES = [
     ("pet food (any 2 small parts)",
      {"any:" + "|".join(PET_SCRAPS): 2}, "food:pet food"),
     # -- the scribe's trade ------------------------------------------------
-    ("sheet of vellum", {"hide": 2}, "material:vellum"),
+    ("vellum from a hide (x2)", {"hide": 1}, "material:vellum#2"),
+    ("vellum from a skin", {"skin": 1}, "material:vellum"),
     ("quill", {"feather": 2}, "material:quill"),
-    ("vial of ink", {"gall gland": 2}, "material:ink"),
+    ("ink from a gall gland (x2)", {"gall gland": 1}, "material:ink#2"),
     ("spellbook", {"vellum": 6, "hide": 1, "ink": 1}, "spellbook"),
     ("copy a scroll (casters)", {"vellum": 1, "ink": 1, "quill": 1},
      "copy_scroll"),
@@ -67,6 +68,8 @@ WEAPON_DEFS = {
 
 # Bows fire with 'f'; swung in melee they're just an awkward club.
 RANGED = {"short bow", "long bow"}
+# Maximum firing range (Chebyshev radius) by bow.
+RANGED_RANGE = {"short bow": 5, "long bow": 7}
 
 ARMOR_DEFS = {
     "leather armor": 2,

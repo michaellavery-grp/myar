@@ -328,11 +328,14 @@ def test_crafting():
                make_material("dragon hide", 4)):
         p.add_item(it)
     bow = None
-    scribe_chain = ("material:vellum", "material:quill", "material:ink",
-                    "spellbook", "copy_scroll", "etch_scroll")
+    def _is_scribe(result):
+        return (result.startswith("material:vellum")
+                or result.startswith("material:ink")
+                or result in ("material:quill", "spellbook",
+                              "copy_scroll", "etch_scroll"))
     for i, (name, needs, result) in enumerate(RECIPES):
-        if result in scribe_chain:
-            continue  # exercised by test_scrollcraft
+        if _is_scribe(result):
+            continue  # exercised by test_scrollcraft / test_scribing
         assert g.can_craft(RECIPES[i]), name
         if result in ("arrows", "poison_arrows"):
             bow = next(it for it in p.inventory if it.subtype == "short bow")
@@ -656,7 +659,10 @@ def test_scrollcraft():
     from .items import make_material, RECIPES, Item
 
     def ridx(result):
-        return next(i for i, r in enumerate(RECIPES) if r[2] == result)
+        # Tolerate the "#N" output-count suffix on material recipes.
+        key = result.split("#")[0]
+        return next(i for i, r in enumerate(RECIPES)
+                    if r[2].split("#")[0] == key)
 
     g = Game("Scribe", _race("Fairy"), _cclass("Illusionist"))
     p = g.player
@@ -738,7 +744,10 @@ def test_scribing_and_dweomery():
     from .items import make_material, RECIPES, Item
 
     def ridx(result):
-        return next(i for i, r in enumerate(RECIPES) if r[2] == result)
+        # Tolerate the "#N" output-count suffix on material recipes.
+        key = result.split("#")[0]
+        return next(i for i, r in enumerate(RECIPES)
+                    if r[2].split("#")[0] == key)
 
     def menu(g):
         """Exactly what the crafting table would display right now."""
@@ -940,6 +949,131 @@ def test_fowl_flocking_and_retrofit():
     print(f"ok  fowl flocking (avg {avg:.1f}/flock) + pre-v1.4 retrofit")
 
 
+def test_ranged_combat():
+    """Bows: range caps, no firing through walls, skeleton arrow-resist."""
+    import rogue.game as game_mod
+    from .items import make_weapon, RANGED_RANGE
+    from .monsters import MONSTERS, Monster as M
+
+    g = Game("Archer", _race("Wood-Elf"), _cclass("Ranger"))
+    p = g.player
+    # Find an open run of floor to lay out the test precisely
+    room = next(r for r in g.level.rooms if not r.gone and r.w >= 8)
+    fy = room.y + 1
+    p.x, p.y = room.x + 1, fy
+    bow = make_weapon("short bow")
+    p.add_item(bow)
+    g.wield(bow)
+    assert RANGED_RANGE["short bow"] == 5 and RANGED_RANGE["long bow"] == 7
+
+    # A goblin just past short-bow range is not a valid target...
+    goblin_t = next(t for t in MONSTERS if t.name == "goblin")
+    far = M(goblin_t, p.x + 6, fy, 3)
+    g.level.monsters = [far]
+    assert g._ranged_target() is None, "short bow hit beyond 5 squares"
+    # ...but a long bow (range 7) can reach it
+    longbow = make_weapon("long bow")
+    p.add_item(longbow)
+    g.wield(longbow)
+    assert g._ranged_target() is far, "long bow couldn't reach 6 squares"
+
+    # No shooting through a wall: drop a wall between archer and target
+    g.wield(bow)
+    near = M(goblin_t, p.x + 3, fy, 3)
+    g.level.monsters = [near]
+    assert g._ranged_target() is near
+    g.level.grid[fy][p.x + 2] = "|"          # a wall in the way
+    assert not g._clear_shot(near.x, near.y)
+    assert g._ranged_target() is None, "fired an arrow through a wall"
+    g.level.grid[fy][p.x + 2] = "."          # restore
+
+    # Skeletons take roughly half ranged damage. Use a deadeye archer so
+    # nearly every shot lands, fire many times at each, compare totals.
+    skel_t = next(t for t in MONSTERS if t.name == "skeleton")
+    p.level, p.stats["Dex"] = 25, 22  # huge to-hit; arrows land
+    p.weapon.hit_ench = 5
+
+    def total_damage(mtype):
+        tgt = M(mtype, p.x + 2, fy, 2)
+        tgt.asleep = False
+        tgt.hp = tgt.max_hp = 100000
+        g.level.monsters = [tgt]
+        for _ in range(400):
+            g.fire()
+            g.drain_msgs()
+        return tgt.max_hp - tgt.hp
+
+    skel_dmg = total_damage(skel_t)
+    gob_dmg = total_damage(goblin_t)
+    assert skel_dmg < gob_dmg * 0.7, \
+        f"skeleton took {skel_dmg}, goblin {gob_dmg} — resist too weak"
+    print("ok  ranged: bow ranges (5/7), no wall shots, skeleton resist")
+
+
+def test_corridor_sight():
+    """The player sees creatures down the full length of a corridor."""
+    g = Game("Scout", _race("Human"), _cclass("Fighter"))
+    # Build a clean horizontal corridor in rock and stand at one end
+    lvl = g.level
+    y = 0
+    # find a fully-rock row to carve (avoid clobbering rooms)
+    for ty in range(len(lvl.grid)):
+        if all(c == " " for c in lvl.grid[ty][2:14]):
+            y = ty
+            break
+    else:
+        print("ok  corridor sight (no clean rock row; skipped)")
+        return
+    for x in range(2, 14):
+        lvl.grid[y][x] = "#"
+    g.player.x, g.player.y = 2, y
+    from .monsters import MONSTERS, Monster as M
+    rat = M(next(t for t in MONSTERS if t.name == "giant rat"), 11, y, 1)
+    lvl.monsters = [rat]
+    g.compute_fov()
+    assert (11, y) in lvl.visible, "far corridor tile not visible"
+    assert g.monster_visible(rat), "creature down the corridor unseen"
+    # A wall mid-corridor should block sight beyond it
+    lvl.grid[y][6] = "|"
+    g.compute_fov()
+    assert (11, y) not in lvl.visible, "saw past a wall in the corridor"
+    print("ok  corridor sight: whole length visible, walls block")
+
+
+def test_scroll_knowledge_and_thief():
+    """Arcane casters often know a scroll's name on pickup; thieves can
+    read scrolls."""
+    import rogue.game as game_mod
+    from .items import Item
+
+    # Arcane caster identifies scrolls on pickup (INT-boosted chance)
+    g = Game("Mage", _race("Sun-Elf"), _cclass("Wizard"))
+    p = g.player
+    p.stats["Int"] = 18
+    ided = 0
+    for _ in range(60):
+        sc = Item("scroll", "teleportation")
+        g.identified.discard(("scroll", "teleportation"))
+        g.level.items[(p.x, p.y)] = [sc]
+        g.pickup()
+        if ("scroll", "teleportation") in g.identified:
+            ided += 1
+        # clear inventory scrolls for the next round
+        p.inventory = [it for it in p.inventory if it.kind != "scroll"]
+    assert ided > 20, f"arcane scroll-recognition too rare ({ided}/60)"
+
+    # A Thief can read a scroll and get its effect
+    g = Game("Sneak", _race("Human"), _cclass("Thief"))
+    p = g.player
+    sc = Item("scroll", "magic mapping")
+    p.add_item(sc)
+    g.identify(sc)
+    explored0 = len(g.level.explored)
+    assert g.read(sc), "thief could not read a scroll"
+    assert len(g.level.explored) > explored0, "thief's scroll had no effect"
+    print("ok  scroll knowledge (arcane) + thieves read scrolls")
+
+
 def test_new_monsters():
     """Ghost (incorporeal), wraith (needs magic), spectre (drain),
     acid, spores, and the new cryptids exist and behave."""
@@ -1085,10 +1219,12 @@ def test_temple():
     assert g.temple_price("bless") == full // 2  # halved at max rank
     assert g.temple_price("holy water") == g.TEMPLE_BASE_PRICES["holy water"]
 
-    # Prayer never crashes and (eventually) grants something across tries
+    # Prayer never crashes and (eventually) grants something across tries.
+    # (Reset the per-temple gate each loop — we're sampling the RNG here.)
     import rogue.game as game_mod
     granted = False
     for _ in range(50):
+        g.level.temple_prayed = False
         hp_before, mhp_before = p.hp, p.max_hp
         pts_before = g.pending_stat_points
         g.temple_pray()
@@ -1098,7 +1234,21 @@ def test_temple():
         g.pending_stat_points = 0
         p.temp_hp = 0
     assert granted, "prayer never granted a benefit in 50 tries"
-    print("ok  temple: bless, uncurse, restore, holy water, tithe tiers, pray")
+
+    # Pray is once per temple — a second prayer at the same altar is refused
+    g.level.temple_prayed = False
+    g.temple_pray()
+    assert g.level.temple_prayed
+    p.hp = p.max_hp = 200
+    p.temp_hp = 0
+    g.pending_stat_points = 0
+    g.temple_pray()  # second attempt
+    assert (g.pending_stat_points == 0 and p.temp_hp == 0), \
+        "prayed twice at the same temple"
+    # A fresh level's temple is a fresh prayer
+    g.goto_depth(g.depth + 1, "up")
+    assert not g.temple_already_prayed(), "new temple should allow a prayer"
+    print("ok  temple: bless, uncurse, restore, holy water, tithe, pray-once")
 
 
 def test_drop_balance():
@@ -1168,6 +1318,8 @@ def test_user_save_fixture():
     expected = dict(mats_before)
     if old_version < 9:  # teeth back-pay for the fang fix
         expected["teeth"] = expected.get("teeth", 0) + 6
+    if old_version < 14:  # vellum retcon for the hide/skin buff
+        expected["vellum"] = expected.get("vellum", 0) + 6
     assert mats_after == expected, \
         f"migration altered materials: {mats_before} -> {mats_after}"
     assert g.player.gold == gold_before, "migration altered gold"
@@ -1247,6 +1399,9 @@ if __name__ == "__main__":
     test_scribing_and_dweomery()
     test_fowl()
     test_fowl_flocking_and_retrofit()
+    test_ranged_combat()
+    test_corridor_sight()
+    test_scroll_knowledge_and_thief()
     test_new_monsters()
     test_temple()
     test_drop_balance()

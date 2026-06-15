@@ -22,6 +22,7 @@ Flags:
     spores       its attack may loose confusing spores
     slow         acts only every other turn
     ferocious    hits especially hard for its depth
+    arrow_resist a gap-toothed frame arrows slip through — half ranged damage
 """
 
 import random
@@ -67,7 +68,7 @@ MONSTERS = [
     MonsterType("zombie", "z", 3, "3d8", 11, "1d8", 17, 4, 16,
                 _f("undead", "mindless")),
     MonsterType("skeleton", "S", 2, "2d8", 12, "1d6", 14, 2, 20,
-                _f("undead", "mindless")),
+                _f("undead", "mindless", "arrow_resist")),
     MonsterType("hobgoblin", "H", 4, "4d8", 14, "2d4", 30, 5, 18,
                 _f("humanoid", "fangs")),
     MonsterType("giant centipede", "c", 4, "3d6", 15, "1d3", 25, 5, 18,

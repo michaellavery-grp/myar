@@ -181,11 +181,21 @@ def migrate_game(game):
                 game.msg("(Six monster teeth settle into your crafting "
                          "bag — fanged foes now shed them.)")
 
+        # v14: hides and skins now make vellum more generously. Retcon a
+        # stack of parchment for the hides you already spent.
+        if old < 14:
+            bag = p.bag()
+            if bag is not None:
+                bag.contents["vellum"] = bag.contents.get("vellum", 0) + 6
+                game.msg("(Six sheets of vellum are pressed into your bag — "
+                         "your old hides and skins should have made more.)")
+
         for lvl in game.levels.values():
             _ensure(lvl, "crafting_table", None)
             _ensure(lvl, "trader_pos", None)
             _ensure(lvl, "trader_stock", [])
             _ensure(lvl, "temple_pos", None)
+            _ensure(lvl, "temple_prayed", False)
             _ensure(lvl, "seen_items", set())
             for room in lvl.rooms:
                 _ensure(room, "biome", "")

@@ -261,6 +261,21 @@ class Game:
         for dy in range(-radius, radius + 1):
             for dx in range(-radius, radius + 1):
                 vis.add((p.x + dx, p.y + dy))
+        # See down the full length of corridors (and a peek into the room
+        # at the far end), so creatures ahead are never a blind surprise.
+        start_room = room
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1),
+                       (1, 1), (-1, -1), (1, -1), (-1, 1)):
+            cx, cy = p.x, p.y
+            for _ in range(14):
+                cx += dx
+                cy += dy
+                if not lvl.passable(cx, cy):
+                    break
+                vis.add((cx, cy))
+                r = lvl.room_at(cx, cy)
+                if r is not None and r is not start_room:
+                    break  # reveal the far doorway, then stop at the room
         lvl.visible = vis
         lvl.explored |= vis
         for pos in list(lvl.items):
@@ -362,11 +377,16 @@ class Game:
                 self.msg("You snatch up the Amulet of Yendor! "
                          "Now flee to the surface!")
             else:
-                if ("appraise" in p.cclass.traits
-                        and item.kind in ("potion", "scroll")
-                        and not self.is_identified(item) and chance(0.5)):
-                    self.identify(item)
-                    self.msg("Your scholarly eye knows this one.")
+                if (item.kind in ("potion", "scroll")
+                        and not self.is_identified(item)):
+                    if "appraise" in p.cclass.traits and chance(0.5):
+                        self.identify(item)
+                        self.msg("Your scholarly eye knows this one.")
+                    elif (p.is_arcane() and item.kind == "scroll"
+                          and chance(0.35 + 0.05 * p.mod("Int"))):
+                        self.identify(item)
+                        self.msg("You recognize the incantation on the "
+                                 "scroll at a glance.")
                 if not p.add_item(item):
                     self.msg("Your pack is full.")
                     break
@@ -566,15 +586,53 @@ class Game:
             self.offer_study = True
         return True
 
+    def _clear_shot(self, tx, ty):
+        """True if no wall blocks the line from the player to (tx, ty)."""
+        x0, y0 = self.player.x, self.player.y
+        dx, dy = abs(tx - x0), abs(ty - y0)
+        sx = 1 if tx > x0 else -1
+        sy = 1 if ty > y0 else -1
+        err = dx - dy
+        x, y = x0, y0
+        while (x, y) != (tx, ty):
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x += sx
+            if e2 < dx:
+                err += dx
+                y += sy
+            if (x, y) == (tx, ty):
+                break
+            if not self.level.passable(x, y):
+                return False  # an arrow cannot fly through stone
+        return True
+
+    def _ranged_target(self):
+        """Nearest shootable monster: within bow range and with a clear,
+        unobstructed line — no firing through walls."""
+        from .items import RANGED_RANGE
+        p = self.player
+        rng = RANGED_RANGE.get(p.weapon.subtype, 5)
+        cands = [m for m in self.level.monsters
+                 if not m.tamed
+                 and _dist(p.x, p.y, m.x, m.y) <= rng
+                 and self._clear_shot(m.x, m.y)]
+        if not cands:
+            return None
+        hostile = [m for m in cands if m.attitude == "hostile"]
+        pool = hostile or cands
+        return min(pool, key=lambda m: _dist(p.x, p.y, m.x, m.y))
+
     def fire(self):
-        """Loose an arrow at the nearest visible monster."""
+        """Loose an arrow at the nearest monster in range and line of sight."""
         p = self.player
         if not p.has_ranged():
             self.msg("You have no ranged weapon in hand.")
             return False
-        m = self._nearest_visible_monster()
+        m = self._ranged_target()
         if not m:
-            self.msg("There is nothing to shoot at.")
+            self.msg("There is no clear shot in range.")
             return False
         m.asleep = False
         bow = p.weapon
@@ -592,8 +650,13 @@ class Game:
             if bow.poison_charges > 0:
                 bow.poison_charges -= 1  # the venom is spent either way
             return True
-        self.msg(f"Your arrow strikes the {m.name}!")
-        self._hurt_monster(m, p.ranged_damage())
+        dmg = p.ranged_damage()
+        if "arrow_resist" in m.type.flags:
+            dmg = max(1, dmg // 2)  # arrows rattle harmlessly through bone
+            self.msg(f"Your arrow clatters through the {m.name}'s frame.")
+        else:
+            self.msg(f"Your arrow strikes the {m.name}!")
+        self._hurt_monster(m, dmg)
         if bow.poison_charges > 0:
             bow.poison_charges -= 1
             if m in self.level.monsters:
@@ -897,13 +960,18 @@ class Game:
             self._gain_craft_exp(needs)
             return True
         kind, _, subtype = result.partition(":")
+        # A "#N" suffix on the subtype means the craft yields N units.
+        out_count = 1
+        if "#" in subtype:
+            subtype, _, n = subtype.partition("#")
+            out_count = int(n)
         if kind == "potion":
             item = Item("potion", subtype)
             self.identify(item)  # you brewed it; no mystery what it is
         elif kind == "food":
             item = Item("food", subtype)
         elif kind == "material":
-            item = make_material(subtype)
+            item = make_material(subtype, count=out_count)
         elif kind == "armor":
             item = make_armor(subtype)
         else:
@@ -1121,9 +1189,18 @@ class Game:
                      f"rank {p.tithe_level()}. Blessings and prayers will "
                      "favor you more.")
 
+    def temple_already_prayed(self):
+        return self.level.temple_prayed
+
     def temple_pray(self):
-        """A gamble: the higher your tithe, the kinder the answer."""
+        """A gamble: the higher your tithe, the kinder the answer.
+        Each temple grants a single prayer — no grinding the altar."""
         p = self.player
+        if self.level.temple_prayed:
+            self.msg("You have already prayed at this altar. The gods "
+                     "expect you to walk on.")
+            return
+        self.level.temple_prayed = True
         tl = p.tithe_level()
         roll_d = random.random() + 0.08 * tl  # devotion tips the scales
         if roll_d < 0.20:

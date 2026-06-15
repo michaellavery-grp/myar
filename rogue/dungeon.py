@@ -78,6 +78,7 @@ class Level:
         self.trader_pos = None
         self.trader_stock = []
         self.temple_pos = None
+        self.temple_prayed = False   # each temple answers one prayer
 
     def tile(self, x, y):
         if 0 <= x < MAP_W and 0 <= y < MAP_H:
