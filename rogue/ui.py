@@ -636,24 +636,30 @@ def study_menu(scr, game, colors):
         return
     etched = sorted(book.contents)
     selected = [s for s in p.memorized if s in etched]
+    # Sensible default: if nothing is currently in memory, pre-select the
+    # etched spells (up to 3) so a plain ENTER memorizes what you wrote.
+    if not selected:
+        selected = etched[:3]
+    enter_keys = (10, 13, curses.KEY_ENTER)
     while True:
-        _overlay_box(scr, len(etched) + 3,
-                     " Study spellbook — pick up to 3 "
-                     "(letters toggle, ENTER done, ESC keep old) ")
+        _overlay_box(scr, len(etched) + 4,
+                     " Study spellbook (up to 3 in memory) ")
         for i, sub in enumerate(etched):
-            mark = "*" if sub in selected else " "
+            mark = "x" if sub in selected else " "
             _addstr(scr, 2 + i, 4,
                     f"{chr(ord('a') + i)}) [{mark}] {sub}"
                     f"  [{SCROLL_SPELL_MANA.get(sub, 8)} mana]")
         _addstr(scr, 2 + len(etched), 4,
-                f"in memory: {len(selected)}/3")
+                f"In memory: {len(selected)}/3   "
+                "(letter = toggle, ENTER = memorize, ESC = keep current)")
         scr.refresh()
         c = scr.getch()
         if c == 27:  # keep previous memorization
             return
-        if c in (10, 13):
-            p.memorized = selected
-            game.msg("The spells settle into your mind." if selected
+        if c in enter_keys:
+            p.memorized = list(selected)
+            game.msg("The spells settle into your mind: "
+                     + ", ".join(selected) + "." if selected
                      else "You close the book, mind calm and empty.")
             return
         i = c - ord("a")

@@ -870,6 +870,96 @@ def test_scribing_and_dweomery():
           "full craft + cast chain")
 
 
+class _FakeScr:
+    """Minimal curses-screen stand-in: replays a queue of keypresses."""
+    def __init__(self, keys):
+        self._keys = list(keys)
+    def addnstr(self, *a, **k):
+        pass
+    def erase(self):
+        pass
+    def refresh(self):
+        pass
+    def getch(self):
+        return self._keys.pop(0) if self._keys else 27  # ESC if exhausted
+
+
+def test_spell_memorization():
+    """The study menu must actually put etched spells into memory so they
+    appear in the 'z' cast list — the reported 'spell not listed' bug."""
+    from rogue import ui
+    from rogue.items import Item, make_material
+
+    g = Game("Memo", _race("Sun-Elf"), _cclass("Wizard"))
+    p = g.player
+    g.level.grid[p.y][p.x] = "="
+    # Build a book and etch two spells
+    for it in (make_material("vellum", 8), make_material("hide", 2),
+               make_material("ink", 4), make_material("quill", 4)):
+        p.add_item(it)
+    sb = next(i for i, r in enumerate(__import__(
+        "rogue.items", fromlist=["RECIPES"]).RECIPES) if r[2] == "spellbook")
+    assert g.do_craft(sb)
+    book = p.spellbook()
+    # (Wizards start with a magic-mapping scroll; etch that plus one more.)
+    for sub in ("enchant armor", "magic mapping"):
+        if not any(it.kind == "scroll" and it.subtype == sub
+                   for it in p.inventory):
+            p.add_item(Item("scroll", sub))
+        target = next(it for it in p.inventory
+                      if it.kind == "scroll" and it.subtype == sub)
+        g.identify(target)
+        g.pending_etch = {"ink": 1, "quill": 1}
+        assert g.etch_scroll(target), sub   # UI passes the inventory item
+    assert set(book.contents) == {"enchant armor", "magic mapping"}
+    assert p.memorized == [], "nothing memorized before study"
+
+    # Rest offers study; a plain ENTER must memorize the etched spells
+    # (the menu pre-selects them — no easy-to-miss toggle step).
+    assert g.rest() and g.offer_study
+    ui.study_menu(_FakeScr([10]), g, None)   # 10 == ENTER, no toggles
+    assert set(p.memorized) == {"enchant armor", "magic mapping"}, \
+        f"ENTER did not memorize etched spells: {p.memorized}"
+
+    # They must now appear in known_spells (what the 'z' menu lists)
+    keys = {s.key for s in p.known_spells()}
+    assert "scroll:enchant armor" in keys, "book spell missing from cast list"
+    # And be castable
+    spell = next(s for s in p.known_spells()
+                 if s.key == "scroll:magic mapping")
+    p.mana = max(p.mana, spell.mana)
+    explored0 = len(g.level.explored)
+    assert g.cast(spell)
+    assert len(g.level.explored) > explored0
+
+    # ESC keeps the current loadout (item-8 "defaults to previous")
+    ui.study_menu(_FakeScr([ord("a"), 27]), g, None)  # toggle then ESC
+    assert set(p.memorized) == {"enchant armor", "magic mapping"}, \
+        "ESC should have kept the previous memorization"
+
+    # Migration retcon: an etched-but-empty memory is filled on load
+    g2 = Game("Stranded", _race("Sun-Elf"), _cclass("Illusionist"))
+    p2 = g2.player
+    g2.level.grid[p2.y][p2.x] = "="
+    for it in (make_material("vellum", 8), make_material("hide", 2),
+               make_material("ink", 4), make_material("quill", 4)):
+        p2.add_item(it)
+    assert g2.do_craft(sb)
+    sc = Item("scroll", "light")
+    p2.add_item(sc)
+    g2.identify(sc)
+    g2.pending_etch = {"ink": 1, "quill": 1}
+    assert g2.etch_scroll(sc)
+    p2.memorized = []                 # the bugged state
+    g2.save_version = 14
+    from .savecompat import migrate_game
+    g2 = migrate_game(g2)
+    assert g2.player.memorized == ["light"], \
+        "migration did not rescue an empty-memory spellbook"
+    print("ok  spell memorization: ENTER memorizes, cast list updates, "
+          "save retcon")
+
+
 def test_fowl():
     import rogue.game as game_mod
     from .monsters import ANIMAL_TYPES, SPECIAL_PARTS, Monster as M
@@ -1397,6 +1487,7 @@ if __name__ == "__main__":
     test_pet_food_scraps()
     test_scrollcraft()
     test_scribing_and_dweomery()
+    test_spell_memorization()
     test_fowl()
     test_fowl_flocking_and_retrofit()
     test_ranged_combat()

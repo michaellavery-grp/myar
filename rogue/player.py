@@ -251,7 +251,7 @@ class Player:
 
     def remove_one(self, item):
         item.count -= 1
-        if item.count <= 0:
+        if item.count <= 0 and item in self.inventory:
             self.inventory.remove(item)
 
     def get_by_letter(self, letter):

@@ -190,6 +190,17 @@ def migrate_game(game):
                 game.msg("(Six sheets of vellum are pressed into your bag — "
                          "your old hides and skins should have made more.)")
 
+        # v15: the study menu used to require an easily-missed toggle, so
+        # some casters etched spells but ended up with an empty memory.
+        # If a studied spellbook has spells but nothing is memorized,
+        # commit up to three of them now.
+        if old < 15 and p.is_arcane():
+            book = p.spellbook()
+            if book is not None and book.contents and not p.memorized:
+                p.memorized = sorted(book.contents)[:3]
+                game.msg("(Your etched spells settle into memory: "
+                         + ", ".join(p.memorized) + ". Cast them with z.)")
+
         for lvl in game.levels.values():
             _ensure(lvl, "crafting_table", None)
             _ensure(lvl, "trader_pos", None)
