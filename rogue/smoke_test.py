@@ -937,6 +937,27 @@ def test_spell_memorization():
     assert set(p.memorized) == {"enchant armor", "magic mapping"}, \
         "ESC should have kept the previous memorization"
 
+    # Resting re-opens the study menu EVERY time (not just after etching),
+    # so you can re-memorize at will — the reported limitation.
+    p.book_studied = True
+    g.offer_study = False
+    assert g.rest() and g.offer_study, \
+        "rest should re-offer study even with no new spell etched"
+    # A non-caster resting never triggers the study prompt
+    fg = Game("Brawler", _race("Human"), _cclass("Fighter"))
+    assert fg.rest() and not fg.offer_study
+
+    # Resting is interrupted by a hostile in sight
+    from .monsters import MONSTERS, Monster as M
+    g.offer_study = False
+    assert not g.hostile_in_sight()
+    foe = M(next(t for t in MONSTERS if t.name == "goblin"),
+            p.x + 1, p.y, 3)
+    foe.asleep = False
+    g.level.monsters.append(foe)
+    g.compute_fov()
+    assert g.hostile_in_sight(), "adjacent hostile not seen for rest-interrupt"
+
     # Migration retcon: an etched-but-empty memory is filled on load
     g2 = Game("Stranded", _race("Sun-Elf"), _cclass("Illusionist"))
     p2 = g2.player

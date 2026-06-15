@@ -31,7 +31,9 @@ HELP_TEXT = """\
 
   h j k l   move west / south / north / east
   y u b n   move diagonally (arrows also move)
-  .         rest a turn          s   search for traps
+  .         rest N turns          s   search for traps
+            (asks how many; stops if a foe appears; then
+             arcane casters may re-memorize spellbook spells)
   >         descend stairs       <   ascend stairs
   , or g    pick up item         i   inventory
   @         character sheet      f   fire bow (wielded)
@@ -672,11 +674,18 @@ def study_menu(scr, game, colors):
 
 
 def show_help(scr):
-    scr.erase()
-    for i, line in enumerate(HELP_TEXT.splitlines()):
-        _addstr(scr, i + 1, 4, line)
-    scr.refresh()
-    scr.getch()
+    lines = HELP_TEXT.splitlines()
+    per_page = 21
+    pages = [lines[i:i + per_page] for i in range(0, len(lines), per_page)]
+    for pno, page in enumerate(pages):
+        scr.erase()
+        for i, line in enumerate(page):
+            _addstr(scr, i + 1, 4, line)
+        more = ("(press any key for more)" if pno < len(pages) - 1
+                else "(press any key to return)")
+        _addstr(scr, per_page + 2, 4, more)
+        scr.refresh()
+        scr.getch()
 
 
 def confirm(scr, colors, question):
@@ -965,6 +974,14 @@ def main(stdscr):
                     return
                 continue
             try:
+                # Resting asks how long, then rests that many turns
+                # (interrupted if a hostile comes into view), and re-opens
+                # spell memorization afterward for arcane casters.
+                extra_rest = 0
+                if c == ord("."):
+                    n = _prompt_amount(stdscr,
+                                       "Rest how many turns? (ENTER = 1) ")
+                    extra_rest = max(0, (n or 1) - 1)
                 consumed = handle_key(stdscr, game, colors, c)
                 if game.trade_requested:
                     game.trade_requested = False
@@ -974,6 +991,19 @@ def main(stdscr):
                     temple_screen(stdscr, game, colors)
                 if consumed:
                     game.world_tick()
+                    p = game.player
+                    for _ in range(extra_rest):
+                        if game.hostile_in_sight():
+                            game.msg("A monster appears — you stop resting.")
+                            break
+                        if (p.hp >= p.max_hp
+                                and p.mana >= p.max_mana):
+                            game.msg("You are fully rested.")
+                            break
+                        game.rest()
+                        game.world_tick()
+                        draw(stdscr, game, colors)
+                        stdscr.refresh()
                     while game.pending_stat_points > 0:
                         draw(stdscr, game, colors)
                         show_messages(stdscr, game, colors)

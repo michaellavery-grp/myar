@@ -76,7 +76,7 @@ Monster colors: **white** hostile, **yellow** wary, **green** friendly,
 ```
 h j k l     move west / south / north / east
 y u b n     move diagonally           (arrow keys also move)
-.           rest one turn             s   search for traps
+.           rest N turns (prompts)    s   search for traps
 > / <       descend / ascend stairs   , g pick up
 i           inventory                 d   drop item
 @           character sheet           ?   help
@@ -201,9 +201,12 @@ Wizards and Illusionists can turn the dungeon's fauna into a library:
    (one per caster).
 6. **Etch** — 1 ink + 1 quill permanently engraves an identified scroll
    into the book (the scroll is consumed). **Max 6 spells.**
-7. **Memorize** — after a **rest** (`.`) you may study the book and hold
-   up to **3** etched spells in mind; skip the menu (ESC) and your
-   previous memorization stands. Memorized spells are cast with `z`
+7. **Memorize** — **any** rest (`.`) re-opens the study menu (it asks how
+   many turns to rest first), where you may hold up to **3** etched spells
+   in mind. The menu pre-selects your etched spells, so a plain ENTER
+   memorizes them; toggle with the letter keys, or press ESC to keep your
+   current loadout. Re-prepare your spells whenever you rest. Memorized
+   spells are cast with `z`
    using mana — Light (2), Identify (6), Magic Mapping (8),
    Teleportation (8), Enchant Weapon/Armor (15) — turning one lucky
    scroll find into a renewable power.

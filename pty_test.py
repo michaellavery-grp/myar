@@ -70,10 +70,12 @@ def main():
 def _run_scenarios():
 
     # Session 1: new game -> race a, class a, name, reroll stats once then
-    # accept, move/look around, character sheet, save+exit
+    # accept, move/look around, character sheet, help (2 pages), rest
+    # (prompt + ENTER for 1 turn), save+exit
     keys = ["a", "a", "Test\n", "r", "a",
             "l", "j", "h", "k", "y", "u", "b", "n",
-            "i", " ", "?", " ", "@", " ", ".", "s", ",", " ",
+            "i", " ", "?", " ", " ", "@", " ",
+            ".", "\n", "s", ",", " ",
             "S", "y"]
     rc, out, err = run_session(keys)
     assert rc == 0, f"session 1 exit code {rc}\nstderr:\n{err}"

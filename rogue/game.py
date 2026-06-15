@@ -579,12 +579,20 @@ class Game:
         return True
 
     def rest(self):
+        # Resting is also when a caster re-prepares their mind, so any
+        # rest (not just after etching a new spell) offers the study menu.
         p = self.player
         book = p.spellbook()
-        if (p.is_arcane() and book is not None and book.contents
-                and not p.book_studied):
+        if p.is_arcane() and book is not None and book.contents:
             self.offer_study = True
         return True
+
+    def hostile_in_sight(self):
+        """True if a hostile monster is currently visible — used to
+        interrupt a multi-turn rest."""
+        return any(m.attitude == "hostile" and not m.tamed
+                   and self.monster_visible(m)
+                   for m in self.level.monsters)
 
     def _clear_shot(self, tx, ty):
         """True if no wall blocks the line from the player to (tx, ty)."""
