@@ -583,7 +583,7 @@ class Game:
         # rest (not just after etching a new spell) offers the study menu.
         p = self.player
         book = p.spellbook()
-        if p.is_arcane() and book is not None and book.contents:
+        if p.can_scribe() and book is not None and book.contents:
             self.offer_study = True
         return True
 

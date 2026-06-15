@@ -94,9 +94,15 @@ class Player:
 
     def _mana_max(self):
         c = self.cclass
-        if not c.mana_stat:
-            return 0
-        return max(0, int((self.level + self.mod(c.mana_stat)) * c.mana_factor))
+        if c.mana_stat:
+            return max(0, int((self.level + self.mod(c.mana_stat))
+                              * c.mana_factor))
+        # Sun-Elves channel innate arcane power even without a casting
+        # class — a mana pool that grows with level and Intelligence,
+        # so a Sun-Elf Fighter can still cast cantrips and grimoire spells.
+        if "arcane" in self.race.traits:
+            return max(1, self.level + self.mod("Int"))
+        return 0
 
     def refresh_mana_cap(self):
         self.max_mana = self._mana_max()
@@ -215,7 +221,7 @@ class Player:
             spells.insert(0, SUN_CANTRIP)
         if "gloom" in self.race.traits:
             spells.insert(0, DARK_CANTRIP)
-        if self.is_arcane():
+        if self.can_scribe():   # arcane casters and Sun-Elves cast from book
             for sub in self.memorized:
                 spells.append(Spell("scroll:" + sub,
                                     f"{sub.title()} (book)", 1,

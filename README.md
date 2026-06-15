@@ -113,7 +113,7 @@ wariness, starting gold, trader prices, and taming success.
 | **Human** | Ch+1 | 8 | Ambitious — stat gains every 3 levels; cheapest XP curve |
 | **Hobbit** | St−2 In+1 Wi+1 Dx+3 Co+1 Ch+1 | 6 | Stealth, keen eyes, slow digestion |
 | **Wood-Elf** | St−1 In+1 Wi+1 Dx+2 Co−1 Ch+1 | 7 | Keen eyes, stealth, perception (spots traps), bowmaster (+2/+2 with bows, starts with one), beast-friend (+15% taming), **innate taming from level 1** |
-| **Sun-Elf** | St−1 In+2 Wi+2 Dx+1 Co−1 Ch+2 | 6 | Magic resistance, keen eyes, innate **Sunfire Cantrip** (free); **arcane-lettered** — IDs scrolls on sight and works scroll-craft regardless of class |
+| **Sun-Elf** | St−1 In+2 Wi+2 Dx+1 Co−1 Ch+2 | 6 | Magic resistance, keen eyes, innate **Sunfire Cantrip** (free); **arcane-lettered** — an innate **mana pool that grows every level**, IDs scrolls on sight, works scroll-craft, and **casts memorized grimoire spells even as a Fighter** |
 | **Dark-Elf** | In+1 Dx+2 Co−1 Ch−1 | 6 | Stealth, infravision 6; innate **Engulfing Gloom** (free `z` spell): blinds the nearest foe for 6 turns — it can't see out, you strike freely |
 | **Minotaur** | St+4 In−2 Wi−1 Dx−1 Co+2 Ch−2 | 12 | Gore (+2 melee), **charge** (`c`), labyrinth sense (exit compass), infravision 2 |
 | **Fairy** | St−4 In+2 Wi+1 Dx+4 Co−2 Ch+2 | 4 | Levitates over traps, +3 AC, stealth — and very fragile |

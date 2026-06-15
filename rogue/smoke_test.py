@@ -1238,6 +1238,29 @@ def test_arcane_scribes_and_gloom():
     assert sb in se.craftable_now(), "Sun-Elf can't craft a spellbook"
     assert se.do_craft(sb) and p.spellbook() is not None
 
+    # Sun-Elves have an innate mana pool that grows with level, and can
+    # cast memorized grimoire spells even as a Fighter.
+    assert p.max_mana > 0, "Sun-Elf Fighter has no mana"
+    lvl1_mana = p.max_mana
+    p.level = 10
+    p.refresh_mana_cap()
+    assert p.max_mana > lvl1_mana, "Sun-Elf mana did not grow with level"
+    for it in (make_material("ink", 2), make_material("quill", 2)):
+        p.add_item(it)
+    sc = Item("scroll", "light")
+    p.add_item(sc)
+    se.identify(sc)
+    se.pending_etch = {"ink": 1, "quill": 1}
+    assert se.etch_scroll(sc)
+    p.memorized = ["light"]
+    book_spell = next((s for s in p.known_spells()
+                       if s.key == "scroll:light"), None)
+    assert book_spell is not None, "Sun-Elf Fighter can't see book spells"
+    p.mana = p.max_mana
+    before = p.mana
+    assert se.cast(book_spell), "Sun-Elf Fighter couldn't cast from grimoire"
+    assert p.mana == before - book_spell.mana, "book cast didn't spend mana"
+
     # Dark-Elf gloom: innate, free, blinds the nearest foe for 6 turns
     g = Game("Drizzt", _race("Dark-Elf"), _cclass("Fighter"))
     p = g.player

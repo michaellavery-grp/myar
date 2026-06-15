@@ -78,8 +78,9 @@ TRAIT_DESC = {
     "magic_resist": "Magic resistance — +3 on saving throws",
     "corpse_eater": "Corpse eater — feeds on the freshly slain",
     "cantrip": "Sunfire Cantrip — innate spell (z), costs no mana",
-    "arcane": "Arcane-lettered — identifies scrolls on sight, works "
-              "scroll-craft",
+    "arcane": "Arcane-lettered — innate mana that grows each level; "
+              "IDs scrolls on sight, works scroll-craft, casts from a "
+              "grimoire even as a Fighter",
     "gloom": "Engulfing Gloom — innate spell (z): blinds the nearest foe "
              "for 6 turns; it can't see out, you strike freely",
     "perception": "Perception — may notice hidden traps nearby",

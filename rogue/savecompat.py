@@ -165,6 +165,17 @@ def migrate_game(game):
         _ensure(p, "confused", 0)
         _ensure(p, "temp_hp", 0)
         _ensure(p, "tithe_total", 0)
+
+        # v17: Sun-Elves gained an innate mana pool. Recompute the cap for
+        # everyone (harmless) and top up any newly-granted mana.
+        if old < 17:
+            before = getattr(p, "max_mana", 0)
+            p.refresh_mana_cap()
+            if p.max_mana > before:
+                p.mana = p.max_mana
+                if "arcane" in p.race.traits and not p.cclass.mana_stat:
+                    game.msg("(Innate arcane power wells up in you — you "
+                             "can now cast cantrips and grimoire spells.)")
         _ensure(game, "pending_stat_points", 0)
         _ensure(game, "trade_requested", False)
         _ensure(game, "temple_requested", False)
