@@ -382,8 +382,8 @@ class Game:
                     if "appraise" in p.cclass.traits and chance(0.5):
                         self.identify(item)
                         self.msg("Your scholarly eye knows this one.")
-                    elif (p.is_arcane() and item.kind == "scroll"
-                          and chance(0.35 + 0.05 * p.mod("Int"))):
+                    elif (p.can_scribe() and item.kind == "scroll"
+                          and chance(min(0.9, 0.60 + 0.06 * p.mod("Int")))):
                         self.identify(item)
                         self.msg("You recognize the incantation on the "
                                  "scroll at a glance.")
@@ -823,7 +823,7 @@ class Game:
         _, _, result = recipe
         p = self.player
         if result in ("copy_scroll", "etch_scroll", "spellbook"):
-            if not p.is_arcane():
+            if not p.can_scribe():
                 return False
         if result == "spellbook":
             return p.spellbook() is None           # one grimoire only
@@ -912,8 +912,9 @@ class Game:
             return False
         if result in ("copy_scroll", "etch_scroll"):
             p = self.player
-            if not p.is_arcane():
-                self.msg("Only arcane casters work scroll-craft.")
+            if not p.can_scribe():
+                self.msg("Only arcane casters and Sun-Elves work "
+                         "scroll-craft.")
                 return False
             if result == "etch_scroll":
                 book = p.spellbook()
@@ -1382,6 +1383,24 @@ class Game:
         self._hurt_monster(m, dmg)
         return True
 
+    def _sp_gloom(self):
+        """Dark-Elf innate: engulf the nearest foe in blinding gloom for
+        six turns. It cannot see out; you see in and strike freely."""
+        m = self._nearest_visible_monster()
+        if not m:
+            self.msg("There is no foe to engulf.")
+            return False
+        if "mindless" in m.type.flags and "undead" in m.type.flags:
+            # eyeless skeletons/zombies aren't fooled by mere darkness
+            self.msg(f"The gloom gathers, but the {m.name} has no eyes "
+                     "to blind.")
+            return True
+        m.blinded = 6
+        m.asleep = False
+        self.msg(f"Darkness boils up and swallows the {m.name} — it gropes "
+                 "blindly while you see clear within.")
+        return True
+
     def _sp_calm_animal(self):
         p = self.player
         beasts = [m for m in self.level.monsters
@@ -1829,6 +1848,12 @@ class Game:
             if m.asleep:
                 self._maybe_wake(m)
                 continue
+            if m.blinded > 0:
+                # Swallowed in gloom: gropes at random, can't find or
+                # strike the player (who sees and attacks freely).
+                m.blinded -= 1
+                self._stumble(m)
+                continue
             if m.confused > 0:
                 m.confused -= 1
                 self._move_random(m)
@@ -1971,6 +1996,15 @@ class Game:
                     return
                 continue
             if self._try_move(m, m.x + dx, m.y + dy):
+                return
+
+    def _stumble(self, m):
+        """Move at random, never striking the player (blinded monsters)."""
+        dirs = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                if (dx, dy) != (0, 0)]
+        random.shuffle(dirs)
+        for dx, dy in dirs:
+            if self._try_move(m, m.x + dx, m.y + dy):  # never the player tile
                 return
 
     # -- scoring ---------------------------------------------------------------

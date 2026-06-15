@@ -113,8 +113,8 @@ wariness, starting gold, trader prices, and taming success.
 | **Human** | Ch+1 | 8 | Ambitious — stat gains every 3 levels; cheapest XP curve |
 | **Hobbit** | St−2 In+1 Wi+1 Dx+3 Co+1 Ch+1 | 6 | Stealth, keen eyes, slow digestion |
 | **Wood-Elf** | St−1 In+1 Wi+1 Dx+2 Co−1 Ch+1 | 7 | Keen eyes, stealth, perception (spots traps), bowmaster (+2/+2 with bows, starts with one), beast-friend (+15% taming), **innate taming from level 1** |
-| **Sun-Elf** | St−1 In+2 Wi+2 Dx+1 Co−1 Ch+2 | 6 | Magic resistance, keen eyes, innate **Sunfire Cantrip** (free to cast) |
-| **Dark-Elf** | In+1 Dx+2 Co−1 Ch−1 | 6 | Stealth, infravision 6 (sees warm bodies in the dark) |
+| **Sun-Elf** | St−1 In+2 Wi+2 Dx+1 Co−1 Ch+2 | 6 | Magic resistance, keen eyes, innate **Sunfire Cantrip** (free); **arcane-lettered** — IDs scrolls on sight and works scroll-craft regardless of class |
+| **Dark-Elf** | In+1 Dx+2 Co−1 Ch−1 | 6 | Stealth, infravision 6; innate **Engulfing Gloom** (free `z` spell): blinds the nearest foe for 6 turns — it can't see out, you strike freely |
 | **Minotaur** | St+4 In−2 Wi−1 Dx−1 Co+2 Ch−2 | 12 | Gore (+2 melee), **charge** (`c`), labyrinth sense (exit compass), infravision 2 |
 | **Fairy** | St−4 In+2 Wi+1 Dx+4 Co−2 Ch+2 | 4 | Levitates over traps, +3 AC, stealth — and very fragile |
 | **Ghoul** | St+1 In−2 Wi−1 Dx−1 Co+3 Ch−4 | 9 | Poison immune, regenerates, feeds on the slain, **diseased bite** (wounds fester), infravision 3 |
@@ -188,7 +188,8 @@ and press `C` — the menu shows **only what you can make right now**.
 
 ### Scrollcraft & Spellbooks (arcane casters)
 
-Wizards and Illusionists can turn the dungeon's fauna into a library:
+Wizards, Illusionists, and **Sun-Elves of any class** can turn the
+dungeon's fauna into a library:
 
 1. **Vellum** — **1 hide → 2 sheets**, or **1 skin → 1 sheet**.
 2. **Quills** — 2 feathers → 1 quill. Fowl (hens, roosters, ducks, geese,
@@ -399,10 +400,10 @@ and Restore Strength are **half price**.
 - **Potions and scrolls are unidentified** each game ("a murky potion",
   "a scroll titled 'ZELGOR NYM ASH'") until drunk, read, identified by
   scroll, or appraised (Archeologist). Brews you craft yourself are
-  always identified. **Arcane casters** (Wizards, Illusionists) often
-  recognize a scroll's incantation the moment they pick it up — the
-  chance rises with Intelligence. **Any class can read scrolls** — yes,
-  thieves too.
+  always identified. **Arcane casters** (Wizards, Illusionists) and
+  **Sun-Elves of any class** usually recognize a scroll's incantation the
+  moment they pick it up — the chance rises with Intelligence. **Any
+  class can read scrolls** — yes, thieves too.
 - Weapons carry to-hit/damage enchantments (`a +1,+2 long sword`),
   armor an AC bonus; both can be raised by enchant scrolls, masterwork
   or magical crafting.

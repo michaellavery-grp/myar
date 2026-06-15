@@ -78,6 +78,10 @@ TRAIT_DESC = {
     "magic_resist": "Magic resistance — +3 on saving throws",
     "corpse_eater": "Corpse eater — feeds on the freshly slain",
     "cantrip": "Sunfire Cantrip — innate spell (z), costs no mana",
+    "arcane": "Arcane-lettered — identifies scrolls on sight, works "
+              "scroll-craft",
+    "gloom": "Engulfing Gloom — innate spell (z): blinds the nearest foe "
+             "for 6 turns; it can't see out, you strike freely",
     "perception": "Perception — may notice hidden traps nearby",
     "bowmaster": "Bowmaster — +2 to hit and +2 damage with bows",
     "charge": "Charge (c) — rush a foe in line: +2 hit, +1d8 damage",

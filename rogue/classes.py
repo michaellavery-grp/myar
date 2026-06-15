@@ -40,8 +40,9 @@ class CharClass:
     start_extra: tuple = field(default_factory=tuple)  # (kind, subtype, count)
 
 
-# Innate racial cantrip (Sun-Elves) — costs no mana.
+# Innate racial cantrips — cost no mana, usable by any class.
 SUN_CANTRIP = Spell("sun_bolt", "Sunfire Cantrip", 1, 0)
+DARK_CANTRIP = Spell("gloom", "Engulfing Gloom", 1, 0)
 
 # Mana cost to cast a scroll-spell memorized from an etched spellbook.
 SCROLL_SPELL_MANA = {

@@ -196,6 +196,7 @@ class Monster:
         self.attitude = "hostile"   # hostile | wary | friendly
         self.tamed = False
         self.rooted = 0
+        self.blinded = 0   # turns engulfed in a Dark-Elf's gloom
         self.stuck = 0   # turns a companion has failed to close distance
 
     @property

@@ -40,6 +40,7 @@ def _patch_monster(m):
     _ensure(m, "attitude", "hostile")
     _ensure(m, "tamed", False)
     _ensure(m, "rooted", 0)
+    _ensure(m, "blinded", 0)
     _ensure(m, "stuck", 0)
     _ensure(m, "max_hp", getattr(m, "hp", 1))
     # Relink the type to the current definition when possible so new

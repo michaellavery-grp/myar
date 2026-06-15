@@ -3,7 +3,7 @@
 import random
 import string
 
-from .classes import SUN_CANTRIP, SCROLL_SPELL_MANA, Spell
+from .classes import SUN_CANTRIP, DARK_CANTRIP, SCROLL_SPELL_MANA, Spell
 from .items import make_weapon, make_armor, make_food, make_bag, Item, RANGED
 from .rng import roll
 
@@ -196,8 +196,14 @@ class Player:
         return 50 * lvl * (lvl - 1)
 
     def is_arcane(self):
-        """Arcane (Int-based) casters work scroll-craft and spellbooks."""
+        """Arcane (Int-based) casters who can cast memorized book spells."""
         return self.cclass.mana_stat == "Int"
+
+    def can_scribe(self):
+        """Who may identify scrolls on sight and work the scribe's craft
+        (vellum/quill/ink, copy, spellbook, etch): arcane casters and the
+        lore-steeped Sun-Elves of any class."""
+        return self.is_arcane() or "arcane" in self.race.traits
 
     def spellbook(self):
         return next((it for it in self.inventory
@@ -207,6 +213,8 @@ class Player:
         spells = [s for s in self.cclass.spells if s.level <= self.level]
         if "cantrip" in self.race.traits:
             spells.insert(0, SUN_CANTRIP)
+        if "gloom" in self.race.traits:
+            spells.insert(0, DARK_CANTRIP)
         if self.is_arcane():
             for sub in self.memorized:
                 spells.append(Spell("scroll:" + sub,

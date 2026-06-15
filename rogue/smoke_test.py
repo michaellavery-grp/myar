@@ -1185,6 +1185,81 @@ def test_scroll_knowledge_and_thief():
     print("ok  scroll knowledge (arcane) + thieves read scrolls")
 
 
+def test_arcane_scribes_and_gloom():
+    """Buffed scroll recognition, Sun-Elf scribes, Dark-Elf gloom."""
+    from .items import Item, RECIPES, make_material
+    from .monsters import MONSTERS, Monster as M
+
+    # Scroll recognition is now reliable: a Human Wizard rarely whiffs
+    # all of five scrolls.
+    zero = 0
+    for t in range(400):
+        random.seed(20000 + t)
+        g = Game("Pug", _race("Human"), _cclass("Wizard"))
+        p = g.player
+        ided = 0
+        for sub in ("teleportation", "enchant weapon", "enchant armor",
+                    "light", "identify"):
+            sc = Item("scroll", sub)
+            g.identified.discard(("scroll", sub))
+            g.level.items[(p.x, p.y)] = [sc]
+            g.pickup()
+            if ("scroll", sub) in g.identified:
+                ided += 1
+            p.inventory = [it for it in p.inventory if it.kind != "scroll"]
+        if ided == 0:
+            zero += 1
+    assert zero / 400 < 0.04, f"too many wizards ID nothing ({zero}/400)"
+
+    # Sun-Elf of a NON-caster class can scribe (ID + craft) but a plain
+    # Human Fighter cannot.
+    se = Game("Loremaster", _race("Sun-Elf"), _cclass("Fighter"))
+    assert se.player.can_scribe() and not se.player.is_arcane()
+    assert not Game("Brute", _race("Human"),
+                    _cclass("Fighter")).player.can_scribe()
+    # Sun-Elf Fighter recognizes scrolls on pickup
+    p = se.player
+    got = 0
+    for _ in range(40):
+        sc = Item("scroll", "light")
+        se.identified.discard(("scroll", "light"))
+        se.level.items[(p.x, p.y)] = [sc]
+        se.pickup()
+        if ("scroll", "light") in se.identified:
+            got += 1
+        p.inventory = [it for it in p.inventory if it.kind != "scroll"]
+    assert got > 20, f"Sun-Elf scribe rarely IDs scrolls ({got}/40)"
+    # ...and may craft a spellbook (the menu offers it)
+    se.level.grid[p.y][p.x] = "="
+    for it in (make_material("vellum", 7), make_material("hide", 1),
+               make_material("ink", 1)):
+        p.add_item(it)
+    sb = next(i for i, r in enumerate(RECIPES) if r[2] == "spellbook")
+    assert sb in se.craftable_now(), "Sun-Elf can't craft a spellbook"
+    assert se.do_craft(sb) and p.spellbook() is not None
+
+    # Dark-Elf gloom: innate, free, blinds the nearest foe for 6 turns
+    g = Game("Drizzt", _race("Dark-Elf"), _cclass("Fighter"))
+    p = g.player
+    gloom = next((s for s in p.known_spells() if s.key == "gloom"), None)
+    assert gloom is not None and gloom.mana == 0, "Dark-Elf lacks free gloom"
+    foe = M(next(t for t in MONSTERS if t.name == "goblin"), p.x + 1, p.y, 3)
+    foe.asleep = False
+    g.level.monsters.append(foe)
+    g.compute_fov()
+    assert g.cast(gloom)
+    assert foe.blinded == 6, "gloom did not blind the foe"
+    # A blinded foe stumbles and never lands a blow on the Dark-Elf
+    p.hp = p.max_hp = 200
+    hp0 = p.hp
+    for _ in range(6):
+        g._monsters_act()
+        g.drain_msgs()
+    assert p.hp == hp0, "blinded monster still hit the player"
+    assert foe.blinded == 0, "gloom should have worn off after 6 turns"
+    print("ok  arcane scribes (Wizard+Sun-Elf), Dark-Elf engulfing gloom")
+
+
 def test_new_monsters():
     """Ghost (incorporeal), wraith (needs magic), spectre (drain),
     acid, spores, and the new cryptids exist and behave."""
@@ -1514,6 +1589,7 @@ if __name__ == "__main__":
     test_ranged_combat()
     test_corridor_sight()
     test_scroll_knowledge_and_thief()
+    test_arcane_scribes_and_gloom()
     test_new_monsters()
     test_temple()
     test_drop_balance()
